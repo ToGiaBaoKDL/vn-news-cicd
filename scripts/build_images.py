@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -9,6 +10,7 @@ import yaml
 
 CICD_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = CICD_ROOT.parent
+IMAGE_TAG_PATTERN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")
 
 
 def load_yaml(path: Path) -> dict:
@@ -50,11 +52,19 @@ def image_command(
     return command
 
 
+def validate_tag(tag: str, *, push: bool) -> None:
+    if not IMAGE_TAG_PATTERN.fullmatch(tag):
+        raise ValueError(f"Invalid Docker image tag: {tag}")
+    if push and tag == "latest":
+        raise ValueError("Published images must use an immutable release tag")
+
+
 def main() -> None:
     args = parse_args()
     catalog = load_yaml(CICD_ROOT / "images.yaml")
     release = load_yaml(CICD_ROOT / "envs" / f"{args.environment}.yaml")
     tag = args.tag or release["tag"]
+    validate_tag(tag, push=args.push)
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))
     if unknown_images:

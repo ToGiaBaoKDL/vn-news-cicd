@@ -1,6 +1,6 @@
 version: 1
 registry: docker.io
-namespace: tgbao
+namespace: toilachuoituyet
 default_tag: "0.1.0"
 
 images:
@@ -32,8 +32,6 @@ images:
       context: vn-news-orchestration
       repo: vn-news-orchestration
       dockerfile: Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib
 
   service_feed_ingestor:
     image_repository: vn-news-feed-ingestor

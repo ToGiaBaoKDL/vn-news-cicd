@@ -7,7 +7,7 @@ STORAGE_BOOTSTRAP_ARGS ?=
 TOPIC_BOOTSTRAP_ARGS ?=
 RPK_COMMAND ?= docker compose -f ../vn-news-infra/compose.yaml exec -T redpanda rpk
 
-.PHONY: install lock validate lint format format-check test build-images push-images bootstrap-storage bootstrap-topics register-event-schemas
+.PHONY: install lock validate lint format format-check test build-images push-images bootstrap-ingestion bootstrap-storage bootstrap-topics register-event-schemas
 
 install:
 	$(UV) --cache-dir $(UV_CACHE_DIR) sync --all-groups
@@ -35,6 +35,8 @@ build-images:
 
 push-images:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/build_images.py --environment $(ENVIRONMENT) --push $(BUILD_IMAGE_ARGS)
+
+bootstrap-ingestion: bootstrap-topics register-event-schemas bootstrap-storage
 
 bootstrap-storage:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/bootstrap_storage.py $(STORAGE_BOOTSTRAP_ARGS)
