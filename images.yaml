@@ -1,0 +1,72 @@
+version: 1
+registry: docker.io
+namespace: tgbao
+default_tag: "0.1.0"
+
+images:
+  app_api:
+    image_repository: vn-news-api
+    build:
+      type: python_package
+      context: vn-news-app
+      repo: vn-news-app
+      dockerfile: api/Dockerfile
+      package_name: news-api
+      package_dir: api
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib
+
+  app_web:
+    image_repository: vn-news-web
+    build:
+      type: node_app
+      context: vn-news-app
+      repo: vn-news-app
+      dockerfile: web/Dockerfile
+      app_dir: web
+
+  orchestration_airflow:
+    image_repository: vn-news-airflow
+    build:
+      type: python_project
+      context: vn-news-orchestration
+      repo: vn-news-orchestration
+      dockerfile: Dockerfile
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib
+
+  service_feed_ingestor:
+    image_repository: vn-news-feed-ingestor
+    build:
+      type: python_package
+      context: vn-news-services
+      repo: vn-news-services
+      dockerfile: services/feed_ingestor/Dockerfile
+      package_name: news-feed-ingestor
+      package_dir: services/feed_ingestor
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib
+
+  service_article_fetcher:
+    image_repository: vn-news-article-fetcher
+    build:
+      type: python_package
+      context: vn-news-services
+      repo: vn-news-services
+      dockerfile: services/article_fetcher/Dockerfile
+      package_name: news-article-fetcher
+      package_dir: services/article_fetcher
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib
+
+  service_article_extractor:
+    image_repository: vn-news-article-extractor
+    build:
+      type: python_package
+      context: vn-news-services
+      repo: vn-news-services
+      dockerfile: services/article_extractor/Dockerfile
+      package_name: news-article-extractor
+      package_dir: services/article_extractor
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib

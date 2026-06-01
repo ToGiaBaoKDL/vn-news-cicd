@@ -1,0 +1,35 @@
+[project]
+name = "vn-news-cicd"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "boto3>=1.43.18",
+  "httpx>=0.27",
+  "news-platform-lib",
+  "PyYAML>=6.0",
+]
+
+[tool.uv.sources]
+news-platform-lib = { path = "../vn-news-platform-lib", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.4",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
