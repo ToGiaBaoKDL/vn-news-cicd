@@ -3,16 +3,17 @@ name: Publish Images
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: Immutable Docker image tag, for example 0.1.0 or 2026-06-02.1
+      release_manifest:
+        description: Release manifest filename under releases/
         required: true
+        default: 0.1.0.toml
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: publish-images-${{ inputs.release_tag }}
+  group: publish-images-${{ inputs.release_manifest }}
   cancel-in-progress: false
 
 jobs:
@@ -26,11 +27,19 @@ jobs:
         with:
           path: vn-news-cicd
 
+      - name: Read release manifest
+        id: release
+        working-directory: vn-news-cicd
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: python3 -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+
       - name: Check out app
         uses: actions/checkout@v6
         with:
           repository: ${{ github.repository_owner }}/vn-news-app
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ steps.release.outputs.vn_news_app_ref }}
           path: vn-news-app
 
       - name: Check out config
@@ -38,6 +47,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/vn-news-config
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ steps.release.outputs.vn_news_config_ref }}
           path: vn-news-config
 
       - name: Check out infra
@@ -45,6 +55,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/vn-news-infra
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ steps.release.outputs.vn_news_infra_ref }}
           path: vn-news-infra
 
       - name: Check out orchestration
@@ -52,6 +63,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/vn-news-orchestration
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ steps.release.outputs.vn_news_orchestration_ref }}
           path: vn-news-orchestration
 
       - name: Check out platform library
@@ -59,6 +71,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/vn-news-platform-lib
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
           path: vn-news-platform-lib
 
       - name: Check out services
@@ -66,13 +79,14 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/vn-news-services
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ steps.release.outputs.vn_news_services_ref }}
           path: vn-news-services
 
       - name: Create reserved pipelines workspace
         run: mkdir vn-news-pipelines
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "0.11.17"
           python-version: "3.12"
@@ -89,7 +103,7 @@ jobs:
           uv sync --frozen --all-groups
           uv lock --check
           uv run python -m pytest
-          uv run python scripts/validate_workspace.py
+          uv run python -m scripts.validate_workspace
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -100,5 +114,5 @@ jobs:
       - name: Build and push images
         working-directory: vn-news-cicd
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: uv run python scripts/build_images.py --environment prod --tag "$RELEASE_TAG" --push
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: uv run python -m scripts.build_images --environment prod --tag "$RELEASE_TAG" --push

@@ -16,7 +16,7 @@ lock:
 	$(UV) --cache-dir $(UV_CACHE_DIR) lock
 
 validate:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/validate_workspace.py
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.validate_workspace
 
 lint:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run ruff check .
@@ -31,10 +31,10 @@ test:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m pytest
 
 build-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/build_images.py --environment $(ENVIRONMENT) $(BUILD_IMAGE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --environment $(ENVIRONMENT) $(BUILD_IMAGE_ARGS)
 
 push-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/build_images.py --environment $(ENVIRONMENT) --push $(BUILD_IMAGE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --environment $(ENVIRONMENT) --push $(BUILD_IMAGE_ARGS)
 
 bootstrap-ingestion: bootstrap-topics register-event-schemas bootstrap-storage
 

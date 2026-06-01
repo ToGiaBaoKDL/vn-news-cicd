@@ -65,7 +65,7 @@ jobs:
         run: mkdir vn-news-pipelines
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "0.11.17"
           python-version: "3.12"
@@ -81,4 +81,4 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
           uv run python -m pytest
-          uv run python scripts/validate_workspace.py
+          uv run python -m scripts.validate_workspace

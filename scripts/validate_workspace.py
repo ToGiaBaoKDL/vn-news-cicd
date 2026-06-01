@@ -9,6 +9,8 @@ from news_platform.config import load_settings, load_sources
 from news_platform.contracts.events import EVENT_CONTRACTS, EVENT_TOPIC_KEYS
 from news_platform.contracts.tables import load_table_specs
 
+from scripts.release_manifest import RELEASES_ROOT, load_release_manifest
+
 CICD_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = CICD_ROOT.parent
 
@@ -61,6 +63,14 @@ def validate_release_envs() -> None:
         if not release.get("tag"):
             msg = f"envs/{environment}.yaml must define tag"
             raise ValueError(msg)
+
+
+def validate_release_manifests() -> None:
+    manifests = sorted(RELEASES_ROOT.glob("*.toml"))
+    if not manifests:
+        raise ValueError("releases/ must contain at least one release manifest")
+    for path in manifests:
+        load_release_manifest(path)
 
 
 def validate_table_buckets(config: dict) -> None:
@@ -384,6 +394,7 @@ def validate_event_contracts(config: dict) -> None:
 
 def main() -> None:
     validate_release_envs()
+    validate_release_manifests()
     config = load_settings()
     sources = load_sources(settings=config)
     enabled_sources = [source for source in sources if source["enabled"]]
