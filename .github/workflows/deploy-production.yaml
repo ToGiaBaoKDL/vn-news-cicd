@@ -6,7 +6,7 @@ on:
       release_manifest:
         description: Release manifest filename under releases/
         required: true
-        default: 0.2.2.toml
+        default: 0.2.3.toml
         type: string
 
 permissions:
