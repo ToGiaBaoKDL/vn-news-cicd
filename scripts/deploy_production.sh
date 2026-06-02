@@ -23,7 +23,7 @@ checkout_repo() {
 }
 
 write_seaweedfs_s3_config() {
-  local config_path="${SEAWEEDFS_S3_CONFIG_HOST_FILE:-$deploy_root/secrets/seaweedfs-s3.json}"
+  local config_path="$deploy_root/secrets/seaweedfs-s3.json"
 
   mkdir -p "$(dirname "$config_path")"
   SEAWEEDFS_S3_CONFIG_HOST_FILE="$config_path" python3 - <<'PY'
