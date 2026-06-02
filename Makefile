@@ -39,10 +39,10 @@ push-images:
 bootstrap-ingestion: bootstrap-topics register-event-schemas bootstrap-storage
 
 bootstrap-storage:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/bootstrap_storage.py $(STORAGE_BOOTSTRAP_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.bootstrap_storage $(STORAGE_BOOTSTRAP_ARGS)
 
 bootstrap-topics:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/bootstrap_topics.py --rpk-command "$(RPK_COMMAND)" --brokers redpanda:9092 $(TOPIC_BOOTSTRAP_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.bootstrap_topics --rpk-command "$(RPK_COMMAND)" --brokers redpanda:9092 $(TOPIC_BOOTSTRAP_ARGS)
 
 register-event-schemas:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python scripts/register_event_schemas.py $(SCHEMA_REGISTRY_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.register_event_schemas $(SCHEMA_REGISTRY_ARGS)

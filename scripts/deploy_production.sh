@@ -24,6 +24,38 @@ checkout_repo() {
   git -C "$repo_dir" checkout --quiet --detach "$commit_ref"
 }
 
+write_seaweedfs_s3_config() {
+  local config_path="${SEAWEEDFS_S3_CONFIG_HOST_FILE:-$deploy_root/secrets/seaweedfs-s3.json}"
+
+  mkdir -p "$(dirname "$config_path")"
+  SEAWEEDFS_S3_CONFIG_HOST_FILE="$config_path" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+config_path = Path(os.environ["SEAWEEDFS_S3_CONFIG_HOST_FILE"])
+temporary_path = config_path.with_suffix(f"{config_path.suffix}.tmp")
+config = {
+    "identities": [
+        {
+            "name": "vn-news-ingestion",
+            "credentials": [
+                {
+                    "accessKey": os.environ["AWS_ACCESS_KEY_ID"],
+                    "secretKey": os.environ["AWS_SECRET_ACCESS_KEY"],
+                }
+            ],
+            "actions": ["Admin", "Read", "Write", "List", "Tagging"],
+        }
+    ]
+}
+temporary_path.write_text(json.dumps(config), encoding="utf-8")
+temporary_path.chmod(0o600)
+temporary_path.replace(config_path)
+PY
+  export SEAWEEDFS_S3_CONFIG_HOST_FILE="$config_path"
+}
+
 mkdir -p "$repos_root"
 checkout_repo vn-news-infra "$infra_ref"
 checkout_repo vn-news-config "$config_ref"
@@ -59,6 +91,12 @@ case "$role" in
       exit 1
     fi
 
+    if ! command -v python3 >/dev/null; then
+      echo "python3 is required on the platform node" >&2
+      exit 1
+    fi
+
+    write_seaweedfs_s3_config
     "${platform_compose[@]}" pull
     "${platform_compose[@]}" up -d --wait \
       airflow-db docker-socket-proxy redpanda redpanda-console seaweedfs-s3
@@ -67,11 +105,11 @@ case "$role" in
       cd "$cicd_root"
       export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
       uv sync --frozen --all-groups
-      uv run python scripts/bootstrap_topics.py \
+      uv run python -m scripts.bootstrap_topics \
         --rpk-command "${platform_compose[*]} exec -T redpanda rpk" \
         --brokers redpanda:9092
-      uv run python scripts/register_event_schemas.py
-      uv run python scripts/bootstrap_storage.py
+      uv run python -m scripts.register_event_schemas
+      uv run python -m scripts.bootstrap_storage
     )
 
     "${platform_compose[@]}" run --rm --no-deps airflow-scheduler airflow db migrate
