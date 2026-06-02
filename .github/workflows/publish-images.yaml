@@ -27,12 +27,19 @@ jobs:
         with:
           path: vn-news-cicd
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.17"
+          python-version: "3.12"
+          working-directory: vn-news-cicd
+
       - name: Read release manifest
         id: release
         working-directory: vn-news-cicd
         env:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
-        run: python3 -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+        run: uv run --no-project --python 3.12 python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
 
       - name: Check out app
         uses: actions/checkout@v6
@@ -84,13 +91,6 @@ jobs:
 
       - name: Create reserved pipelines workspace
         run: mkdir vn-news-pipelines
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.1.0
-        with:
-          version: "0.11.17"
-          python-version: "3.12"
-          working-directory: vn-news-cicd
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
