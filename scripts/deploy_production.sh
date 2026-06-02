@@ -5,8 +5,6 @@ role="${1:?role is required}"
 release_tag="${2:?release tag is required}"
 infra_ref="${3:?infra ref is required}"
 config_ref="${4:?config ref is required}"
-cicd_ref="${5:?cicd ref is required}"
-platform_lib_ref="${6:?platform library ref is required}"
 
 deploy_root="${VN_NEWS_DEPLOY_ROOT:-$HOME/vn-news-intelligence}"
 repos_root="$deploy_root/repos"
@@ -82,9 +80,15 @@ workers_compose=(docker compose --env-file "$env_file" -f "$infra_root/compose.w
 
 case "$role" in
   platform)
+    cicd_ref="${5:?cicd ref is required}"
+    platform_lib_ref="${6:?platform library ref is required}"
+    app_ref="${7:?app ref is required}"
     checkout_repo vn-news-cicd "$cicd_ref"
     checkout_repo vn-news-platform-lib "$platform_lib_ref"
+    checkout_repo vn-news-app "$app_ref"
     cicd_root="$repos_root/vn-news-cicd"
+    app_root="$repos_root/vn-news-app"
+    app_compose=(docker compose --env-file "$env_file" -f "$app_root/compose.yaml")
 
     if ! command -v uv >/dev/null; then
       echo "uv is required on the platform node" >&2
@@ -114,6 +118,8 @@ case "$role" in
 
     "${platform_compose[@]}" run --rm --no-deps airflow-scheduler airflow db migrate
     "${platform_compose[@]}" up -d --wait
+    "${app_compose[@]}" pull
+    "${app_compose[@]}" up -d --wait
     ;;
   workers)
     "${workers_compose[@]}" pull

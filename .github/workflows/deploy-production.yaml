@@ -6,7 +6,7 @@ on:
       release_manifest:
         description: Release manifest filename under releases/
         required: true
-        default: 0.2.1.toml
+        default: 0.2.2.toml
         type: string
 
 permissions:
@@ -49,9 +49,10 @@ jobs:
           INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
           PLATFORM_LIB_REF: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
+          APP_REF: ${{ steps.release.outputs.vn_news_app_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            platform "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" "$PLATFORM_LIB_REF" \
+            platform "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" "$PLATFORM_LIB_REF" "$APP_REF" \
             < scripts/deploy_production.sh
 
   deploy-workers:
@@ -86,8 +87,7 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
           INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
-          PLATFORM_LIB_REF: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            workers "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" "$PLATFORM_LIB_REF" \
+            workers "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" \
             < scripts/deploy_production.sh
