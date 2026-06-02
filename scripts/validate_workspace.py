@@ -19,7 +19,6 @@ CONFIG_ROOT = WORKSPACE_ROOT / "vn-news-config"
 CONFIG_DIR = CONFIG_ROOT / "configs"
 INFRA_ROOT = WORKSPACE_ROOT / "vn-news-infra"
 ORCHESTRATION_ROOT = WORKSPACE_ROOT / "vn-news-orchestration"
-PIPELINES_ROOT = WORKSPACE_ROOT / "vn-news-pipelines"
 PLATFORM_LIB_ROOT = WORKSPACE_ROOT / "vn-news-platform-lib"
 SERVICES_ROOT = WORKSPACE_ROOT / "vn-news-services"
 
@@ -33,8 +32,8 @@ def load_toml(path: Path) -> dict:
         return tomllib.load(file)
 
 
-def load_compose() -> dict:
-    compose = load_yaml(INFRA_ROOT / "compose.yaml")
+def load_compose(filename: str = "compose.yaml") -> dict:
+    compose = load_yaml(INFRA_ROOT / filename)
     services: dict = {}
     volumes: dict = {}
     for include in compose.get("include", []):
@@ -49,20 +48,6 @@ def load_compose() -> dict:
 
 def load_image_catalog() -> dict:
     return load_yaml(CICD_ROOT / "images.yaml")
-
-
-def validate_release_envs() -> None:
-    for environment in ("local", "staging", "prod"):
-        release = load_yaml(CICD_ROOT / "envs" / f"{environment}.yaml")
-        if release.get("version") != 1:
-            msg = f"envs/{environment}.yaml version must be 1"
-            raise ValueError(msg)
-        if release.get("environment") != environment:
-            msg = f"envs/{environment}.yaml environment must be {environment}"
-            raise ValueError(msg)
-        if not release.get("tag"):
-            msg = f"envs/{environment}.yaml must define tag"
-            raise ValueError(msg)
 
 
 def validate_release_manifests() -> None:
@@ -96,8 +81,6 @@ def validate_platform_services(config: dict) -> None:
         required_services.add("redpanda")
     if config["storage"]["provider"] == "seaweedfs_s3":
         required_services.add("seaweedfs-s3")
-    if config["storage"]["iceberg"]["catalog"] == "polaris":
-        required_services.update({"polaris", "trino"})
     missing_services = sorted(required_services - set(compose_services))
     if missing_services:
         msg = f"Compose is missing configured platform services: {missing_services}"
@@ -220,7 +203,7 @@ def validate_image_catalog() -> None:
 
     if catalog.get("version") != 1:
         raise ValueError("images.yaml version must be 1")
-    for field in ("registry", "namespace", "default_tag"):
+    for field in ("registry", "namespace"):
         if not catalog.get(field):
             msg = f"images.yaml missing required field: {field}"
             raise ValueError(msg)
@@ -309,7 +292,7 @@ def validate_image_build(image_key: str, build: dict) -> Path:
 
 
 def validate_catalog_dockerfiles(catalog_dockerfiles: list[Path]) -> None:
-    roots = [APP_ROOT, ORCHESTRATION_ROOT, PIPELINES_ROOT, SERVICES_ROOT]
+    roots = [APP_ROOT, ORCHESTRATION_ROOT, SERVICES_ROOT]
     actual_dockerfiles = {path.resolve() for root in roots for path in root.rglob("Dockerfile")}
     missing_entries = sorted(
         str(path.relative_to(WORKSPACE_ROOT))
@@ -361,7 +344,8 @@ def validate_uv_projects() -> None:
 
 def validate_compose_healthchecks() -> None:
     compose_files = {
-        "infra": load_compose(),
+        "infra platform": load_compose(),
+        "infra workers": load_compose("compose.workers.yaml"),
         "app": load_yaml(APP_ROOT / "compose.yaml"),
     }
     for owner, compose in compose_files.items():
@@ -393,7 +377,6 @@ def validate_event_contracts(config: dict) -> None:
 
 
 def main() -> None:
-    validate_release_envs()
     validate_release_manifests()
     config = load_settings()
     sources = load_sources(settings=config)

@@ -61,9 +61,6 @@ jobs:
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           path: vn-news-services
 
-      - name: Create reserved pipelines workspace
-        run: mkdir vn-news-pipelines
-
       - name: Set up uv
         uses: astral-sh/setup-uv@v8.1.0
         with:

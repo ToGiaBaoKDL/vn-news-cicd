@@ -3,8 +3,6 @@ from __future__ import annotations
 import argparse
 
 import boto3
-from botocore import UNSIGNED
-from botocore.client import Config
 from botocore.exceptions import ClientError
 from news_platform.config import load_settings
 
@@ -12,7 +10,6 @@ from news_platform.config import load_settings
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bootstrap configured object-storage buckets.")
     parser.add_argument("--endpoint-url")
-    parser.add_argument("--anonymous", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -24,12 +21,9 @@ def is_missing_bucket(error: ClientError) -> bool:
 def main() -> None:
     args = parse_args()
     config = load_settings()
-    anonymous = args.anonymous or config["storage"].get("anonymous", False)
-    client_config = Config(signature_version=UNSIGNED) if anonymous else Config()
     client = boto3.client(
         "s3",
         endpoint_url=args.endpoint_url or config["storage"]["endpoint_url"],
-        config=client_config,
     )
 
     for layer, bucket in config["storage"]["buckets"].items():

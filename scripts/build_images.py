@@ -19,9 +19,8 @@ def load_yaml(path: Path) -> dict:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build images declared in images.yaml.")
-    parser.add_argument("--environment", default="local", choices=["local", "staging", "prod"])
     parser.add_argument("--image", action="append", dest="images")
-    parser.add_argument("--tag")
+    parser.add_argument("--tag", required=True)
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -55,9 +54,7 @@ def image_command(
 def main() -> None:
     args = parse_args()
     catalog = load_yaml(CICD_ROOT / "images.yaml")
-    release = load_yaml(CICD_ROOT / "envs" / f"{args.environment}.yaml")
-    tag = args.tag or release["tag"]
-    validate_tag(tag, push=args.push)
+    validate_tag(args.tag, push=args.push)
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))
     if unknown_images:
@@ -65,7 +62,7 @@ def main() -> None:
         raise ValueError(msg)
 
     for image_key in image_keys:
-        command = image_command(catalog, image_key, tag, args.push)
+        command = image_command(catalog, image_key, args.tag, args.push)
         print(shlex.join(command))
         if not args.dry_run:
             subprocess.run(command, check=True)

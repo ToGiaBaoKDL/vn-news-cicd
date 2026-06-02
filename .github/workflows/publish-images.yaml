@@ -6,7 +6,7 @@ on:
       release_manifest:
         description: Release manifest filename under releases/
         required: true
-        default: 0.1.0.toml
+        default: 0.2.0.toml
         type: string
 
 permissions:
@@ -89,9 +89,6 @@ jobs:
           ref: ${{ steps.release.outputs.vn_news_services_ref }}
           path: vn-news-services
 
-      - name: Create reserved pipelines workspace
-        run: mkdir vn-news-pipelines
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -115,4 +112,4 @@ jobs:
         working-directory: vn-news-cicd
         env:
           RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
-        run: uv run python -m scripts.build_images --environment prod --tag "$RELEASE_TAG" --push
+        run: uv run python -m scripts.build_images --tag "$RELEASE_TAG" --push

@@ -1,7 +1,7 @@
 UV ?= uv
 UV_CACHE_DIR ?= /tmp/uv-cache
 BUILD_IMAGE_ARGS ?=
-ENVIRONMENT ?= local
+TAG ?= dev
 SCHEMA_REGISTRY_ARGS ?=
 STORAGE_BOOTSTRAP_ARGS ?=
 TOPIC_BOOTSTRAP_ARGS ?=
@@ -31,10 +31,10 @@ test:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m pytest
 
 build-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --environment $(ENVIRONMENT) $(BUILD_IMAGE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --tag $(TAG) $(BUILD_IMAGE_ARGS)
 
 push-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --environment $(ENVIRONMENT) --push $(BUILD_IMAGE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --tag $(TAG) --push $(BUILD_IMAGE_ARGS)
 
 bootstrap-ingestion: bootstrap-topics register-event-schemas bootstrap-storage
 

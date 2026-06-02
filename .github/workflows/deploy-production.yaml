@@ -1,0 +1,93 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_manifest:
+        description: Release manifest filename under releases/
+        required: true
+        default: 0.2.0.toml
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@v6
+
+      - name: Read release manifest
+        id: release
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Deploy platform node
+        env:
+          HOST: ${{ secrets.ORACLE_PLATFORM_HOST }}
+          USER: ${{ secrets.ORACLE_SSH_USER }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
+          PLATFORM_LIB_REF: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
+        run: |
+          ssh "$USER@$HOST" bash -s -- \
+            platform "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" "$PLATFORM_LIB_REF" \
+            < scripts/deploy_production.sh
+
+  deploy-workers:
+    needs: deploy-platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@v6
+
+      - name: Read release manifest
+        id: release
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Deploy worker node
+        env:
+          HOST: ${{ secrets.ORACLE_WORKERS_HOST }}
+          USER: ${{ secrets.ORACLE_SSH_USER }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
+          PLATFORM_LIB_REF: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
+        run: |
+          ssh "$USER@$HOST" bash -s -- \
+            workers "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" "$PLATFORM_LIB_REF" \
+            < scripts/deploy_production.sh

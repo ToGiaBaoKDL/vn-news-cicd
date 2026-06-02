@@ -1,7 +1,6 @@
 version: 1
 registry: docker.io
 namespace: toilachuoituyet
-default_tag: "0.1.0"
 
 images:
   app_api:
