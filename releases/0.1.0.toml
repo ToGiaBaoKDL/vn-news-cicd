@@ -4,7 +4,7 @@ release_tag = "0.1.0"
 [repositories]
 vn-news-app = "30ff2fff776e6bc7811cb6f3759e226541677abd"
 vn-news-config = "f66e79042befd7622c11c2e6dcc556ea22299895"
-vn-news-infra = "5a1cfb91029b727edb7b9ee7be3bb472ea556e6f"
+vn-news-infra = "2388ec3086ffd82c9f7244525951c6e4c76118ee"
 vn-news-orchestration = "666e02df2eb0e04c86930bb5f454695516c7a273"
 vn-news-platform-lib = "b7e351639b07b477168e258fb554964dd0f76fd6"
 vn-news-services = "5f0306f17818224080ed6e00cad3e8d16bc74cbb"
