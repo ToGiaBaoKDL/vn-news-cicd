@@ -203,7 +203,13 @@ def validate_orchestration() -> None:
     )
     if missing_files:
         raise ValueError(f"vn-news-orchestration missing files: {missing_files}")
-    forbidden_files = ["Dockerfile", ".dockerignore", "news_orchestration/__init__.py"]
+    forbidden_files = [
+        "Dockerfile",
+        ".dockerignore",
+        "pyproject.toml",
+        "uv.lock",
+        "news_orchestration/__init__.py",
+    ]
     present_forbidden = sorted(
         path for path in forbidden_files if (ORCHESTRATION_ROOT / path).exists()
     )
@@ -322,7 +328,6 @@ def validate_uv_projects() -> None:
         APP_ROOT,
         CICD_ROOT,
         INFRA_ROOT / "airflow" / "runtime",
-        ORCHESTRATION_ROOT,
         PLATFORM_LIB_ROOT,
         SERVICES_ROOT,
     ]
