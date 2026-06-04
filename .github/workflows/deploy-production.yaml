@@ -6,7 +6,7 @@ on:
       release_manifest:
         description: Release manifest filename under releases/
         required: true
-        default: 0.2.5.toml
+        default: 0.2.5-infra-cleanup.toml
         type: string
 
 permissions:
