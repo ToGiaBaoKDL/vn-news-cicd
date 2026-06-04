@@ -1,6 +1,9 @@
 version: 1
 registry: docker.io
 namespace: toilachuoituyet
+platforms:
+  - linux/amd64
+  - linux/arm64
 
 images:
   app_api:

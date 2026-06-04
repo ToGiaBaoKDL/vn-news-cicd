@@ -44,6 +44,9 @@ def image_command(
         "--tag",
         f"{catalog['registry']}/{catalog['namespace']}/{image['image_repository']}:{tag}",
     ]
+    platforms = catalog.get("platforms", [])
+    if push and platforms:
+        command.extend(["--platform", ",".join(platforms)])
     for name, path in sorted(build.get("additional_contexts", {}).items()):
         command.extend(["--build-context", f"{name}={WORKSPACE_ROOT / path}"])
     command.append("--push" if push else "--load")
