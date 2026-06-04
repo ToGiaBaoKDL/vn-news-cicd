@@ -86,11 +86,10 @@ jobs:
           CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
           CICD_REF: ${{ github.sha }}
           ORCHESTRATION_REF: ${{ steps.release.outputs.vn_news_orchestration_ref }}
-          PLATFORM_LIB_REF: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
           APP_REF: ${{ steps.release.outputs.vn_news_app_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            control "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$ORCHESTRATION_REF" "$PLATFORM_LIB_REF" "$APP_REF" \
+            control "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$ORCHESTRATION_REF" "$APP_REF" \
             < scripts/deploy_production.sh
 
   deploy-processing:
