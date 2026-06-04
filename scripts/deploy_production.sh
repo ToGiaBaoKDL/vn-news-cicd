@@ -98,13 +98,13 @@ case "$role" in
     (
       cd "$cicd_root"
       export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
-      export AWS_SHARED_CREDENTIALS_FILE="$VN_NEWS_SECRETS_HOST_DIR/ingestion-s3-credentials"
       uv sync --frozen --all-groups
       uv run python -m scripts.bootstrap_topics \
         --rpk-command "docker run --rm --entrypoint rpk ${REDPANDA_IMAGE:-redpandadata/redpanda:v26.1.9}" \
         --brokers "$VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS"
       uv run python -m scripts.register_event_schemas \
         --registry-url "$VN_NEWS_SCHEMA_REGISTRY_URL"
+      export AWS_SHARED_CREDENTIALS_FILE="$VN_NEWS_SECRETS_HOST_DIR/platform-s3-credentials"
       uv run python -m scripts.bootstrap_storage \
         --endpoint-url "$VN_NEWS_STORAGE_ENDPOINT_URL"
     )
