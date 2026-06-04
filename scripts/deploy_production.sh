@@ -101,7 +101,7 @@ case "$role" in
       export AWS_SHARED_CREDENTIALS_FILE="$VN_NEWS_SECRETS_HOST_DIR/ingestion-s3-credentials"
       uv sync --frozen --all-groups
       uv run python -m scripts.bootstrap_topics \
-        --rpk-command "docker run --rm ${REDPANDA_IMAGE:-redpandadata/redpanda:v26.1.9} rpk" \
+        --rpk-command "docker run --rm --entrypoint rpk ${REDPANDA_IMAGE:-redpandadata/redpanda:v26.1.9}" \
         --brokers "$VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS"
       uv run python -m scripts.register_event_schemas \
         --registry-url "$VN_NEWS_SCHEMA_REGISTRY_URL"
