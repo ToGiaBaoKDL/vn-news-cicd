@@ -190,12 +190,25 @@ def validate_services() -> None:
 
 
 def validate_orchestration() -> None:
-    required_files = {"dags/etl_docker_rss_ingestion.py"}
+    required_files = {
+        ".airflowignore",
+        "configs/rss_ingestion.yaml",
+        "dags/etl_docker_rss_ingestion.py",
+        "news_orchestration/utils/config.py",
+        "news_orchestration/utils/env.py",
+        "news_orchestration/utils/sources.py",
+    }
     missing_files = sorted(
         path for path in required_files if not (ORCHESTRATION_ROOT / path).is_file()
     )
     if missing_files:
         raise ValueError(f"vn-news-orchestration missing files: {missing_files}")
+    forbidden_files = ["Dockerfile", ".dockerignore", "news_orchestration/__init__.py"]
+    present_forbidden = sorted(
+        path for path in forbidden_files if (ORCHESTRATION_ROOT / path).exists()
+    )
+    if present_forbidden:
+        raise ValueError(f"vn-news-orchestration has forbidden files: {present_forbidden}")
 
 
 def validate_image_catalog() -> None:
@@ -277,8 +290,9 @@ def validate_image_build(image_key: str, build: dict) -> Path:
             msg = f"Image {image_key} package_name must be {actual_package_name}"
             raise ValueError(msg)
     elif build_type == "python_project":
-        if not (WORKSPACE_ROOT / repo / "pyproject.toml").exists():
-            msg = f"Image {image_key} references missing Python project: {repo}"
+        project_dir = build.get("project_dir", ".")
+        if not (WORKSPACE_ROOT / repo / project_dir / "pyproject.toml").exists():
+            msg = f"Image {image_key} references missing Python project: {repo}/{project_dir}"
             raise ValueError(msg)
     elif build_type == "node_app":
         app_dir = build.get("app_dir")
@@ -292,7 +306,7 @@ def validate_image_build(image_key: str, build: dict) -> Path:
 
 
 def validate_catalog_dockerfiles(catalog_dockerfiles: list[Path]) -> None:
-    roots = [APP_ROOT, ORCHESTRATION_ROOT, SERVICES_ROOT]
+    roots = [APP_ROOT, INFRA_ROOT, SERVICES_ROOT]
     actual_dockerfiles = {path.resolve() for root in roots for path in root.rglob("Dockerfile")}
     missing_entries = sorted(
         str(path.relative_to(WORKSPACE_ROOT))
@@ -307,6 +321,7 @@ def validate_uv_projects() -> None:
     project_roots = [
         APP_ROOT,
         CICD_ROOT,
+        INFRA_ROOT / "airflow" / "runtime",
         ORCHESTRATION_ROOT,
         PLATFORM_LIB_ROOT,
         SERVICES_ROOT,
@@ -321,7 +336,7 @@ def validate_uv_projects() -> None:
 
     python_dockerfiles = [
         APP_ROOT / "api" / "Dockerfile",
-        ORCHESTRATION_ROOT / "Dockerfile",
+        INFRA_ROOT / "airflow" / "runtime" / "Dockerfile",
         SERVICES_ROOT / "services" / "feed_ingestor" / "Dockerfile",
         SERVICES_ROOT / "services" / "article_fetcher" / "Dockerfile",
         SERVICES_ROOT / "services" / "article_extractor" / "Dockerfile",

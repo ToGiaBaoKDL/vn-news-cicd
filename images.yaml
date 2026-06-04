@@ -27,12 +27,13 @@ images:
       dockerfile: web/Dockerfile
       app_dir: web
 
-  orchestration_airflow:
-    image_repository: vn-news-airflow
+  infra_airflow_runtime:
+    image_repository: vn-news-airflow-runtime
     build:
       type: python_project
-      context: vn-news-orchestration
-      repo: vn-news-orchestration
+      context: vn-news-infra/airflow/runtime
+      repo: vn-news-infra
+      project_dir: airflow/runtime
       dockerfile: Dockerfile
 
   service_feed_ingestor:

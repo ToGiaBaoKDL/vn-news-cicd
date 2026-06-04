@@ -29,17 +29,17 @@ def test_pushed_image_uses_catalog_platforms() -> None:
         "namespace": "example",
         "platforms": ["linux/amd64", "linux/arm64"],
         "images": {
-            "airflow": {
-                "image_repository": "vn-news-airflow",
+            "airflow_runtime": {
+                "image_repository": "vn-news-airflow-runtime",
                 "build": {
-                    "context": "vn-news-orchestration",
+                    "context": "vn-news-infra/airflow/runtime",
                     "dockerfile": "Dockerfile",
                 },
             },
         },
     }
 
-    command = image_command(catalog, "airflow", "0.2.5", push=True)
+    command = image_command(catalog, "airflow_runtime", "0.2.5", push=True)
 
     assert "--platform" in command
     assert "linux/amd64,linux/arm64" in command
@@ -52,17 +52,17 @@ def test_local_image_load_does_not_use_multi_platforms() -> None:
         "namespace": "example",
         "platforms": ["linux/amd64", "linux/arm64"],
         "images": {
-            "airflow": {
-                "image_repository": "vn-news-airflow",
+            "airflow_runtime": {
+                "image_repository": "vn-news-airflow-runtime",
                 "build": {
-                    "context": "vn-news-orchestration",
+                    "context": "vn-news-infra/airflow/runtime",
                     "dockerfile": "Dockerfile",
                 },
             },
         },
     }
 
-    command = image_command(catalog, "airflow", "local", push=False)
+    command = image_command(catalog, "airflow_runtime", "local", push=False)
 
     assert "--platform" not in command
     assert "--load" in command
