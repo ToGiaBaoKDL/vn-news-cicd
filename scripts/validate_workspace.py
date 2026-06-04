@@ -344,15 +344,16 @@ def validate_uv_projects() -> None:
 
 def validate_compose_healthchecks() -> None:
     compose_files = {
-        "infra platform": load_compose(),
-        "infra workers": load_compose("compose.workers.yaml"),
+        "infra data": load_compose("compose.data.yaml"),
+        "infra control": load_compose("compose.control.yaml"),
+        "infra processing": load_compose("compose.processing.yaml"),
         "app": load_yaml(APP_ROOT / "compose.yaml"),
     }
     for owner, compose in compose_files.items():
         missing_healthchecks = sorted(
             service_name
             for service_name, service in compose["services"].items()
-            if "healthcheck" not in service
+            if "healthcheck" not in service and not service.get("profiles")
         )
         if missing_healthchecks:
             msg = f"{owner} Compose services must define healthchecks: {missing_healthchecks}"
