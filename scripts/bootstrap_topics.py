@@ -11,7 +11,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bootstrap configured Redpanda topics.")
     parser.add_argument("--brokers")
     parser.add_argument("--rpk-command", default="rpk")
-    parser.add_argument("--allow-auto-create", action="store_true")
+    parser.add_argument("--disable-auto-create", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -31,7 +31,7 @@ def main() -> None:
     config = load_settings()
     prefix = shlex.split(args.rpk_command)
     brokers = args.brokers or config["event_bus"]["bootstrap_servers"]
-    if not args.allow_auto_create:
+    if args.disable_auto_create:
         run(
             rpk_command(
                 prefix,
