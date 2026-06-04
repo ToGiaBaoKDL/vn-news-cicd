@@ -49,7 +49,7 @@ export VN_NEWS_RELEASE_TAG="$release_tag"
 export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
 
 materialize_runtime_secrets() {
-  "$infra_root/scripts/materialize_runtime_secrets.sh" "$role"
+  sudo bash -lc "set -euo pipefail; set -a; source '$env_file'; set +a; '$infra_root/scripts/materialize_runtime_secrets.sh' '$role'"
 }
 
 compose_data=(docker compose --env-file "$env_file" -f "$infra_root/compose.data.yaml")
