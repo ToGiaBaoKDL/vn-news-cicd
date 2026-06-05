@@ -6,7 +6,7 @@ on:
       release_manifest:
         description: Release manifest filename under releases/
         required: true
-        default: 0.2.7.toml
+        default: 0.2.8.toml
         type: string
 
 permissions:
@@ -45,7 +45,7 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_TAG: ${{ steps.release.outputs.image_tag }}
           INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
@@ -81,7 +81,7 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_TAG: ${{ steps.release.outputs.image_tag }}
           INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
           CICD_REF: ${{ github.sha }}
@@ -121,7 +121,7 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_TAG: ${{ steps.release.outputs.image_tag }}
           INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
         run: |

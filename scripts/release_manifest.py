@@ -24,6 +24,7 @@ REQUIRED_REPOSITORIES = (
 @dataclass(frozen=True)
 class ReleaseManifest:
     release_tag: str
+    image_tag: str
     repositories: dict[str, str]
 
 
@@ -38,6 +39,10 @@ def load_release_manifest(path: Path) -> ReleaseManifest:
     if not isinstance(release_tag, str):
         raise ValueError(f"{path} must define release_tag")
     validate_tag(release_tag, push=True)
+    image_tag = manifest.get("image_tag", release_tag)
+    if not isinstance(image_tag, str):
+        raise ValueError(f"{path} image_tag must be a string")
+    validate_tag(image_tag, push=True)
 
     repositories = manifest.get("repositories")
     if not isinstance(repositories, dict):
@@ -50,7 +55,11 @@ def load_release_manifest(path: Path) -> ReleaseManifest:
     for repository, commit_ref in repositories.items():
         if not isinstance(commit_ref, str) or not COMMIT_REF_PATTERN.fullmatch(commit_ref):
             raise ValueError(f"{path} repository {repository} must use a full commit SHA")
-    return ReleaseManifest(release_tag=release_tag, repositories=repositories)
+    return ReleaseManifest(
+        release_tag=release_tag,
+        image_tag=image_tag,
+        repositories=repositories,
+    )
 
 
 def resolve_release_manifest(filename: str) -> Path:
@@ -61,7 +70,10 @@ def resolve_release_manifest(filename: str) -> Path:
 
 
 def write_github_output(manifest: ReleaseManifest, path: Path) -> None:
-    lines = [f"release_tag={manifest.release_tag}"]
+    lines = [
+        f"release_tag={manifest.release_tag}",
+        f"image_tag={manifest.image_tag}",
+    ]
     lines.extend(
         f"{repository.replace('-', '_')}_ref={commit_ref}"
         for repository, commit_ref in sorted(manifest.repositories.items())
@@ -81,7 +93,10 @@ def main() -> None:
     manifest = load_release_manifest(resolve_release_manifest(args.manifest))
     if args.github_output:
         write_github_output(manifest, args.github_output)
-    print(f"release manifest ok: {args.manifest} -> {manifest.release_tag}")
+    print(
+        f"release manifest ok: {args.manifest} -> "
+        f"release={manifest.release_tag}, image={manifest.image_tag}"
+    )
 
 
 if __name__ == "__main__":

@@ -31,7 +31,27 @@ def test_release_manifest_accepts_full_commit_refs(tmp_path: Path) -> None:
 
     manifest = load_release_manifest(path)
 
-    assert manifest == ReleaseManifest(release_tag="0.1.0", repositories=repositories)
+    assert manifest == ReleaseManifest(
+        release_tag="0.1.0",
+        image_tag="0.1.0",
+        repositories=repositories,
+    )
+
+
+def test_release_manifest_accepts_separate_image_tag(tmp_path: Path) -> None:
+    path = tmp_path / "release.toml"
+    repositories = {repository: "a" * 40 for repository in REQUIRED_REPOSITORIES}
+    write_manifest(path, repositories)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace('release_tag = "0.1.0"', 'release_tag = "0.1.1"\nimage_tag = "0.1.0"'),
+        encoding="utf-8",
+    )
+
+    manifest = load_release_manifest(path)
+
+    assert manifest.release_tag == "0.1.1"
+    assert manifest.image_tag == "0.1.0"
 
 
 def test_release_manifest_requires_every_repository(tmp_path: Path) -> None:
@@ -56,11 +76,12 @@ def test_github_output_uses_checkout_keys(tmp_path: Path) -> None:
     path = tmp_path / "github-output"
     manifest = ReleaseManifest(
         release_tag="0.1.0",
+        image_tag="0.1.0",
         repositories={"vn-news-app": "a" * 40},
     )
 
     write_github_output(manifest, path)
 
     assert path.read_text(encoding="utf-8") == (
-        "release_tag=0.1.0\nvn_news_app_ref=" + "a" * 40 + "\n"
+        "release_tag=0.1.0\nimage_tag=0.1.0\nvn_news_app_ref=" + "a" * 40 + "\n"
     )

@@ -8,6 +8,10 @@ on:
         required: true
         default: 0.2.7.toml
         type: string
+      images:
+        description: Optional comma-separated image keys from images.yaml
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -111,5 +115,17 @@ jobs:
       - name: Build and push images
         working-directory: vn-news-cicd
         env:
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
-        run: uv run python -m scripts.build_images --tag "$RELEASE_TAG" --push
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+          IMAGES: ${{ inputs.images }}
+        run: |
+          image_args=()
+          if [[ -n "$IMAGES" ]]; then
+            IFS=',' read -ra image_keys <<< "$IMAGES"
+            for image_key in "${image_keys[@]}"; do
+              image_key="${image_key//[[:space:]]/}"
+              if [[ -n "$image_key" ]]; then
+                image_args+=(--image "$image_key")
+              fi
+            done
+          fi
+          uv run python -m scripts.build_images "${image_args[@]}" --tag "$IMAGE_TAG" --push
