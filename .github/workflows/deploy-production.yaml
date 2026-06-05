@@ -17,10 +17,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-data:
+  release:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: production
+    timeout-minutes: 10
+    outputs:
+      image_tag: ${{ steps.release.outputs.image_tag }}
+      vn_news_app_ref: ${{ steps.release.outputs.vn_news_app_ref }}
+      vn_news_config_ref: ${{ steps.release.outputs.vn_news_config_ref }}
+      vn_news_infra_ref: ${{ steps.release.outputs.vn_news_infra_ref }}
+      vn_news_orchestration_ref: ${{ steps.release.outputs.vn_news_orchestration_ref }}
     steps:
       - name: Check out CI/CD
         uses: actions/checkout@v6
@@ -37,6 +42,15 @@ jobs:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
 
+  deploy-data:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@v6
+
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
@@ -51,27 +65,21 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ steps.release.outputs.image_tag }}
-          INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
+          RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
+          INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
             data "$RELEASE_TAG" "$INFRA_REF" "$GITHUB_SHA" \
             < scripts/deploy_production.sh
 
   deploy-control:
-    needs: deploy-data
+    needs: [release, deploy-data]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
     steps:
       - name: Check out CI/CD
         uses: actions/checkout@v6
-
-      - name: Read release manifest
-        id: release
-        env:
-          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
-        run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
 
       - name: Configure SSH
         env:
@@ -87,31 +95,25 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ steps.release.outputs.image_tag }}
-          INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
-          CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
+          RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
+          INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ needs.release.outputs.vn_news_config_ref }}
           CICD_REF: ${{ github.sha }}
-          ORCHESTRATION_REF: ${{ steps.release.outputs.vn_news_orchestration_ref }}
-          APP_REF: ${{ steps.release.outputs.vn_news_app_ref }}
+          ORCHESTRATION_REF: ${{ needs.release.outputs.vn_news_orchestration_ref }}
+          APP_REF: ${{ needs.release.outputs.vn_news_app_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
             control "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$ORCHESTRATION_REF" "$APP_REF" \
             < scripts/deploy_production.sh
 
   deploy-processing:
-    needs: deploy-control
+    needs: [release, deploy-control]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
     steps:
       - name: Check out CI/CD
         uses: actions/checkout@v6
-
-      - name: Read release manifest
-        id: release
-        env:
-          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
-        run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
 
       - name: Configure SSH
         env:
@@ -127,9 +129,9 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ steps.release.outputs.image_tag }}
-          INFRA_REF: ${{ steps.release.outputs.vn_news_infra_ref }}
-          CONFIG_REF: ${{ steps.release.outputs.vn_news_config_ref }}
+          RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
+          INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ needs.release.outputs.vn_news_config_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
             processing "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" \

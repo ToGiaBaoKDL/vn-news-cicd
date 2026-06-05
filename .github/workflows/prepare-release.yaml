@@ -1,0 +1,110 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: New release manifest tag, for example 0.2.10
+        required: true
+        type: string
+      image_tag:
+        description: Image tag to deploy. Leave empty to build/publish images with release_tag.
+        required: false
+        type: string
+      default_ref:
+        description: Default ref for all repos.
+        required: true
+        default: main
+        type: string
+      repo_refs:
+        description: Optional repo=ref overrides, comma or newline separated.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.17"
+          python-version: "3.12"
+
+      - name: Prepare release manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          DEFAULT_REF: ${{ inputs.default_ref }}
+          REPO_REFS: ${{ inputs.repo_refs }}
+        run: |
+          prepare_args=(
+            --release-tag "$RELEASE_TAG"
+            --default-ref "$DEFAULT_REF"
+            --refs "$REPO_REFS"
+          )
+          if [[ -n "$IMAGE_TAG" ]]; then
+            prepare_args+=(--image-tag "$IMAGE_TAG")
+          fi
+          uv run --no-project --python 3.12 python -m scripts.prepare_release "${prepare_args[@]}"
+
+      - name: Validate release manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          RELEASE_MANIFEST: ${{ inputs.release_tag }}.toml
+        run: |
+          uv run --no-project --python 3.12 python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST"
+          uv run --no-project --python 3.12 python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
+
+      - name: Open release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          branch="release/$RELEASE_TAG"
+          manifest="releases/$RELEASE_TAG.toml"
+          effective_image_tag="${IMAGE_TAG:-$RELEASE_TAG}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add "$manifest"
+          git commit -m "chore(release): prepare $RELEASE_TAG"
+          git push --force-with-lease origin "$branch"
+
+          body=$(
+            cat <<EOF
+          Prepare production release manifest.
+
+          - release_tag: $RELEASE_TAG
+          - image_tag: $effective_image_tag
+
+          After this PR is merged:
+          1. Run Publish Images if image_tag is new.
+          2. Run Deploy Production with $RELEASE_TAG.toml.
+          EOF
+          )
+
+          if gh pr view "$branch" >/dev/null 2>&1; then
+            gh pr edit "$branch" --title "chore(release): prepare $RELEASE_TAG" --body "$body"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "chore(release): prepare $RELEASE_TAG" \
+              --body "$body"
+          fi
