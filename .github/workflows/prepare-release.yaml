@@ -84,6 +84,7 @@ jobs:
           git checkout -B "$branch"
           git add "$manifest"
           git commit -m "chore(release): prepare $RELEASE_TAG"
+          git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
           git push --force-with-lease origin "$branch"
 
           body=$(
