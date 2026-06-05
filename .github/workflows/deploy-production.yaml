@@ -38,7 +38,7 @@ jobs:
 
       - name: Validate release refs
         env:
-          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
 

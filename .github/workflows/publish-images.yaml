@@ -44,7 +44,7 @@ jobs:
       - name: Validate release refs
         working-directory: vn-news-cicd
         env:
-          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: uv run --no-project --python 3.12 python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
 

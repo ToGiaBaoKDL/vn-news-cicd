@@ -45,7 +45,7 @@ jobs:
 
       - name: Prepare release manifest
         env:
-          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           IMAGE_TAG: ${{ inputs.image_tag }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           DEFAULT_REF: ${{ inputs.default_ref }}
@@ -63,7 +63,7 @@ jobs:
 
       - name: Validate release manifest
         env:
-          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           RELEASE_MANIFEST: ${{ inputs.release_tag }}.toml
         run: |
           uv run --no-project --python 3.12 python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST"
