@@ -31,6 +31,12 @@ jobs:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
 
+      - name: Validate release refs
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
+
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}

@@ -8,10 +8,6 @@ on:
         required: true
         default: 0.2.7.toml
         type: string
-      images:
-        description: Optional comma-separated image keys from images.yaml
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -44,6 +40,13 @@ jobs:
         env:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: uv run --no-project --python 3.12 python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate release refs
+        working-directory: vn-news-cicd
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: uv run --no-project --python 3.12 python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
 
       - name: Check out app
         uses: actions/checkout@v6
@@ -116,16 +119,4 @@ jobs:
         working-directory: vn-news-cicd
         env:
           IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
-          IMAGES: ${{ inputs.images }}
-        run: |
-          image_args=()
-          if [[ -n "$IMAGES" ]]; then
-            IFS=',' read -ra image_keys <<< "$IMAGES"
-            for image_key in "${image_keys[@]}"; do
-              image_key="${image_key//[[:space:]]/}"
-              if [[ -n "$image_key" ]]; then
-                image_args+=(--image "$image_key")
-              fi
-            done
-          fi
-          uv run python -m scripts.build_images "${image_args[@]}" --tag "$IMAGE_TAG" --push
+        run: uv run python -m scripts.build_images --tag "$IMAGE_TAG" --push
