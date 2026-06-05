@@ -102,9 +102,11 @@ jobs:
           if gh pr view "$branch" >/dev/null 2>&1; then
             gh pr edit "$branch" --title "chore(release): prepare $RELEASE_TAG" --body "$body"
           else
-            gh pr create \
+            if ! gh pr create \
               --base main \
               --head "$branch" \
               --title "chore(release): prepare $RELEASE_TAG" \
-              --body "$body"
+              --body "$body"; then
+              echo "::notice::Release branch pushed. Create the PR manually: https://github.com/$GITHUB_REPOSITORY/pull/new/$branch"
+            fi
           fi
