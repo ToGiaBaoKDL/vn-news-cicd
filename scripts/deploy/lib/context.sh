@@ -54,10 +54,19 @@ load_role_env() {
   export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
 }
 
+set_role_env_value() {
+  local key="$1"
+  local value="$2"
+
+  sudo sed -i "/^${key}=/d" "$env_file"
+  printf '%s=%s\n' "$key" "$value" | sudo tee -a "$env_file" >/dev/null
+}
+
 prepare_deploy_context() {
   mkdir -p "$repos_root"
   checkout_repo vn-news-infra "$infra_ref"
   load_role_env
+  set_role_env_value VN_NEWS_RELEASE_TAG "$release_tag"
 }
 
 materialize_runtime_secrets() {

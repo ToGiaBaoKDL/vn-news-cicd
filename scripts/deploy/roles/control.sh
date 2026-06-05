@@ -8,6 +8,7 @@ deploy_control_role() {
   checkout_repo vn-news-app "$app_ref"
   set_config_paths
   export VN_NEWS_ORCHESTRATION_GIT_REF="$orchestration_ref"
+  set_role_env_value VN_NEWS_ORCHESTRATION_GIT_REF "$orchestration_ref"
   require_command uv
   require_command python3
 
