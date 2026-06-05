@@ -194,9 +194,9 @@ def validate_orchestration() -> None:
         ".airflowignore",
         "configs/rss_ingestion.yaml",
         "dags/etl_docker_rss_ingestion.py",
-        "news_orchestration/utils/config.py",
-        "news_orchestration/utils/env.py",
-        "news_orchestration/utils/sources.py",
+        "utils/config.py",
+        "utils/env.py",
+        "utils/sources.py",
     }
     missing_files = sorted(
         path for path in required_files if not (ORCHESTRATION_ROOT / path).is_file()
@@ -208,6 +208,7 @@ def validate_orchestration() -> None:
         ".dockerignore",
         "pyproject.toml",
         "uv.lock",
+        "news_orchestration",
         "news_orchestration/__init__.py",
     ]
     present_forbidden = sorted(
