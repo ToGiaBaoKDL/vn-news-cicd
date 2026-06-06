@@ -48,6 +48,12 @@ jobs:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: uv run --no-project --python 3.12 python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
 
+      - name: Check out pinned CI/CD
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release.outputs.vn_news_cicd_ref }}
+          path: vn-news-cicd
+
       - name: Check out app
         uses: actions/checkout@v6
         with:

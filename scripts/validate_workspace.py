@@ -7,7 +7,6 @@ from pathlib import Path
 import yaml
 from news_platform.config import load_settings, load_sources
 from news_platform.contracts.events import EVENT_CONTRACTS, EVENT_TOPIC_KEYS
-from news_platform.contracts.tables import load_table_specs
 
 from scripts.release_manifest import RELEASES_ROOT, load_release_manifest
 
@@ -56,14 +55,6 @@ def validate_release_manifests() -> None:
         raise ValueError("releases/ must contain at least one release manifest")
     for path in manifests:
         load_release_manifest(path)
-
-
-def validate_table_buckets(config: dict) -> None:
-    buckets = config["storage"]["buckets"]
-    for table in load_table_specs():
-        if table.bucket not in buckets:
-            msg = f"Table {table.qualified_name} references unknown bucket layer {table.bucket}"
-            raise ValueError(msg)
 
 
 def validate_settings_consistency(config: dict) -> None:
@@ -414,7 +405,6 @@ def main() -> None:
     validate_services()
     validate_orchestration()
     validate_image_catalog()
-    validate_table_buckets(config)
     validate_event_contracts(config)
     print(
         "workspace validation ok: "

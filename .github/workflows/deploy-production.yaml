@@ -23,6 +23,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.release.outputs.image_tag }}
       vn_news_app_ref: ${{ steps.release.outputs.vn_news_app_ref }}
+      vn_news_cicd_ref: ${{ steps.release.outputs.vn_news_cicd_ref }}
       vn_news_config_ref: ${{ steps.release.outputs.vn_news_config_ref }}
       vn_news_infra_ref: ${{ steps.release.outputs.vn_news_infra_ref }}
       vn_news_orchestration_ref: ${{ steps.release.outputs.vn_news_orchestration_ref }}
@@ -51,6 +52,8 @@ jobs:
     steps:
       - name: Check out CI/CD
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release.outputs.vn_news_cicd_ref }}
 
       - name: Configure SSH
         env:
@@ -68,9 +71,10 @@ jobs:
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
           RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
           INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
+          CICD_REF: ${{ needs.release.outputs.vn_news_cicd_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            data "$RELEASE_TAG" "$INFRA_REF" "$GITHUB_SHA" \
+            data "$RELEASE_TAG" "$INFRA_REF" "$CICD_REF" \
             < scripts/deploy_production.sh
 
   deploy-control:
@@ -81,6 +85,8 @@ jobs:
     steps:
       - name: Check out CI/CD
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release.outputs.vn_news_cicd_ref }}
 
       - name: Configure SSH
         env:
@@ -99,7 +105,7 @@ jobs:
           RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
           INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.release.outputs.vn_news_config_ref }}
-          CICD_REF: ${{ github.sha }}
+          CICD_REF: ${{ needs.release.outputs.vn_news_cicd_ref }}
           ORCHESTRATION_REF: ${{ needs.release.outputs.vn_news_orchestration_ref }}
           APP_REF: ${{ needs.release.outputs.vn_news_app_ref }}
           PLATFORM_LIB_REF: ${{ needs.release.outputs.vn_news_platform_lib_ref }}
@@ -116,6 +122,8 @@ jobs:
     steps:
       - name: Check out CI/CD
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release.outputs.vn_news_cicd_ref }}
 
       - name: Configure SSH
         env:
@@ -134,7 +142,8 @@ jobs:
           RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
           INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.release.outputs.vn_news_config_ref }}
+          CICD_REF: ${{ needs.release.outputs.vn_news_cicd_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            processing "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$GITHUB_SHA" \
+            processing "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" \
             < scripts/deploy_production.sh

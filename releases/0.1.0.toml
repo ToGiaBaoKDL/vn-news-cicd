@@ -2,6 +2,7 @@ version = 1
 release_tag = "0.1.0"
 
 [repositories]
+vn-news-cicd = "d46ccbac110890718d1625c975e764049d47d18a"
 vn-news-app = "30ff2fff776e6bc7811cb6f3759e226541677abd"
 vn-news-config = "f66e79042befd7622c11c2e6dcc556ea22299895"
 vn-news-infra = "8939fdcaeccc11b8a58660802b8b1644aeee2c19"

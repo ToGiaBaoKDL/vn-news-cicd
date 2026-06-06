@@ -12,6 +12,7 @@ CICD_ROOT = Path(__file__).resolve().parents[1]
 RELEASES_ROOT = CICD_ROOT / "releases"
 COMMIT_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
 REQUIRED_REPOSITORIES = (
+    "vn-news-cicd",
     "vn-news-app",
     "vn-news-config",
     "vn-news-infra",

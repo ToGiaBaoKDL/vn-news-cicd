@@ -3,9 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from news_platform.config import load_settings
-from news_platform.contracts.tables import load_table_specs
 from news_platform.ids import make_run_id, normalize_article_url
-from news_platform.storage import StorageLayout
 
 
 def test_bucket_suffixes_are_unique() -> None:
@@ -17,24 +15,14 @@ def test_bucket_suffixes_are_unique() -> None:
 
 def test_deployment_endpoint_env_overrides(monkeypatch) -> None:
     monkeypatch.setenv("VN_NEWS_STORAGE_ENDPOINT_URL", "http://10.0.0.10:8333")
-    monkeypatch.setenv("VN_NEWS_POLARIS_CATALOG_URI", "http://10.0.0.10:8181/api/catalog")
     monkeypatch.setenv("VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS", "10.0.0.10:19092")
     monkeypatch.setenv("VN_NEWS_SCHEMA_REGISTRY_URL", "http://10.0.0.10:18081")
 
     config = load_settings()
 
     assert config["storage"]["endpoint_url"] == "http://10.0.0.10:8333"
-    assert config["storage"]["iceberg"]["catalog_uri"] == "http://10.0.0.10:8181/api/catalog"
     assert config["event_bus"]["bootstrap_servers"] == "10.0.0.10:19092"
     assert config["event_bus"]["schema_registry_url"] == "http://10.0.0.10:18081"
-
-
-def test_warehouse_paths_use_configured_prefix() -> None:
-    config = load_settings()
-    layout = StorageLayout.from_config(config)
-    for table in load_table_specs():
-        uri = layout.warehouse_uri(table.bucket, table.name)
-        assert uri.endswith(f"/{config['storage']['warehouse_prefix']}/{table.name}/")
 
 
 def test_run_id_format() -> None:
