@@ -56,6 +56,7 @@ prepare_streamed_deploy() {
       cicd_ref="${5:?cicd ref is required}"
       export VN_NEWS_DEPLOY_ORCHESTRATION_REF="${6:?orchestration ref is required}"
       export VN_NEWS_DEPLOY_APP_REF="${7:?app ref is required}"
+      export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="${8:?platform lib ref is required}"
       ;;
     processing)
       config_ref="${4:?config ref is required}"

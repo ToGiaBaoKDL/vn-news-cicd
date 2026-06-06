@@ -77,11 +77,17 @@ def test_github_output_uses_checkout_keys(tmp_path: Path) -> None:
     manifest = ReleaseManifest(
         release_tag="0.1.0",
         image_tag="0.1.0",
-        repositories={"vn-news-app": "a" * 40},
+        repositories={
+            "vn-news-app": "a" * 40,
+            "vn-news-platform-lib": "b" * 40,
+        },
     )
 
     write_github_output(manifest, path)
 
     assert path.read_text(encoding="utf-8") == (
-        "release_tag=0.1.0\nimage_tag=0.1.0\nvn_news_app_ref=" + "a" * 40 + "\n"
+        "release_tag=0.1.0\n"
+        "image_tag=0.1.0\n"
+        f"vn_news_app_ref={'a' * 40}\n"
+        f"vn_news_platform_lib_ref={'b' * 40}\n"
     )
