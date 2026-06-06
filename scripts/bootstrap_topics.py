@@ -47,17 +47,32 @@ def main() -> None:
         )
 
     for topic in config["event_bus"]["topics"].values():
+        topic_name = topic["name"]
+        retention_ms = topic["retention_ms"]
         run(
             rpk_command(
                 prefix,
                 "topic",
                 "create",
-                topic["name"],
+                topic_name,
                 "--if-not-exists",
                 "--partitions",
                 str(topic["partitions"]),
                 "--topic-config",
-                f"retention.ms={topic['retention_ms']}",
+                f"retention.ms={retention_ms}",
+                brokers=brokers,
+            ),
+            dry_run=args.dry_run,
+        )
+        run(
+            rpk_command(
+                prefix,
+                "topic",
+                "alter-config",
+                topic_name,
+                "--set",
+                f"retention.ms={retention_ms}",
+                "--no-confirm",
                 brokers=brokers,
             ),
             dry_run=args.dry_run,
