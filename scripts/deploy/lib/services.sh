@@ -3,6 +3,7 @@
 deploy_redpanda() {
   compose_data pull redpanda redpanda-console
   compose_data up -d --wait redpanda redpanda-console
+  compose_data exec -T redpanda rpk cluster config set auto_create_topics_enabled false --no-confirm
 }
 
 deploy_seaweedfs() {

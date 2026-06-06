@@ -6,8 +6,7 @@ bootstrap_event_bus() {
     export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
     uv run python -m scripts.bootstrap_topics \
       --rpk-command "docker run --rm --entrypoint rpk ${REDPANDA_IMAGE:-redpandadata/redpanda:v26.1.9}" \
-      --brokers "$VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS" \
-      --disable-auto-create
+      --brokers "$VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS"
     uv run python -m scripts.register_event_schemas \
       --registry-url "$VN_NEWS_SCHEMA_REGISTRY_URL"
   )
