@@ -1,0 +1,11 @@
+version = 1
+release_tag = "0.2.15"
+image_tag = "0.2.13"
+
+[repositories]
+vn-news-app = "ffb833fbc099b2fcd3bb3cc5e2a73c52f5ef17c1"
+vn-news-config = "c1dfe04aba958cbf07a044598e46ebc0cc6a3faf"
+vn-news-infra = "75dac595dbfe4c859a7241b72dda477f04521ee0"
+vn-news-orchestration = "cc27f0993875c88ee04496e34e6a1aaee7171be0"
+vn-news-platform-lib = "085a303cef3450cbe92bcd15e56ebf929e4221a8"
+vn-news-services = "adb036b5dcd11c5ac94571ebd642be723c2c7fd9"
