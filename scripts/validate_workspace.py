@@ -20,6 +20,17 @@ INFRA_ROOT = WORKSPACE_ROOT / "vn-news-infra"
 ORCHESTRATION_ROOT = WORKSPACE_ROOT / "vn-news-orchestration"
 PLATFORM_LIB_ROOT = WORKSPACE_ROOT / "vn-news-platform-lib"
 SERVICES_ROOT = WORKSPACE_ROOT / "vn-news-services"
+REPOSITORY_ROOTS = [
+    APP_ROOT,
+    CICD_ROOT,
+    CONFIG_ROOT,
+    INFRA_ROOT,
+    ORCHESTRATION_ROOT,
+    PLATFORM_LIB_ROOT,
+    SERVICES_ROOT,
+]
+ACTION_REF_PATTERN = re.compile(r"uses:\s*([^@\s]+)@([^\s#]+)")
+IMMUTABLE_ACTION_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
 def load_yaml(path: Path) -> dict:
@@ -55,6 +66,24 @@ def validate_release_manifests() -> None:
         raise ValueError("releases/ must contain at least one release manifest")
     for path in manifests:
         load_release_manifest(path)
+
+
+def validate_workflow_action_ref(path: Path, action: str, ref: str) -> None:
+    if action.startswith("./"):
+        return
+    if not IMMUTABLE_ACTION_REF_PATTERN.fullmatch(ref):
+        msg = f"{path} must pin {action} to an immutable commit SHA, not {ref}"
+        raise ValueError(msg)
+
+
+def validate_workflow_action_pins() -> None:
+    for root in REPOSITORY_ROOTS:
+        workflow_root = root / ".github" / "workflows"
+        for pattern in ("*.yaml", "*.yml"):
+            for path in sorted(workflow_root.glob(pattern)):
+                content = path.read_text(encoding="utf-8")
+                for action, ref in ACTION_REF_PATTERN.findall(content):
+                    validate_workflow_action_ref(path.relative_to(WORKSPACE_ROOT), action, ref)
 
 
 def validate_settings_consistency(config: dict) -> None:
@@ -391,6 +420,7 @@ def validate_event_contracts(config: dict) -> None:
 
 def main() -> None:
     validate_release_manifests()
+    validate_workflow_action_pins()
     config = load_settings()
     sources = load_sources(settings=config)
     enabled_sources = [source for source in sources if source["enabled"]]

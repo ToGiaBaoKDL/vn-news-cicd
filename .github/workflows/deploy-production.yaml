@@ -30,7 +30,7 @@ jobs:
       vn_news_platform_lib_ref: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
     steps:
       - name: Check out CI/CD
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Read release manifest
         id: release
@@ -44,6 +44,25 @@ jobs:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
 
+      - name: Check out pinned CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ steps.release.outputs.vn_news_cicd_ref }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.17"
+          python-version: "3.12"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Verify published images
+        env:
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+        run: uv run --no-project --with PyYAML python -m scripts.verify_images --tag "$IMAGE_TAG"
+
   deploy-data:
     needs: release
     runs-on: ubuntu-latest
@@ -51,7 +70,7 @@ jobs:
     environment: production
     steps:
       - name: Check out CI/CD
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ needs.release.outputs.vn_news_cicd_ref }}
 
@@ -64,6 +83,12 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Preflight data node
+        env:
+          HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+        run: ssh "$USER@$HOST" bash -s -- data < scripts/preflight_host.sh
 
       - name: Deploy data node
         env:
@@ -84,7 +109,7 @@ jobs:
     environment: production
     steps:
       - name: Check out CI/CD
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ needs.release.outputs.vn_news_cicd_ref }}
 
@@ -97,6 +122,12 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Preflight control node
+        env:
+          HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+        run: ssh "$USER@$HOST" bash -s -- control < scripts/preflight_host.sh
 
       - name: Deploy control node
         env:
@@ -121,7 +152,7 @@ jobs:
     environment: production
     steps:
       - name: Check out CI/CD
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ needs.release.outputs.vn_news_cicd_ref }}
 
@@ -134,6 +165,12 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Preflight processing node
+        env:
+          HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+        run: ssh "$USER@$HOST" bash -s -- processing < scripts/preflight_host.sh
 
       - name: Deploy processing node
         env:
