@@ -189,6 +189,7 @@ def validate_services() -> None:
         "services/feed_ingestor",
         "services/article_fetcher",
         "services/article_extractor",
+        "services/dlq_operator",
     ]
     if root_pyproject["tool"]["uv"]["workspace"]["members"] != expected_members:
         msg = f"vn-news-services uv workspace members must be {expected_members}"
@@ -199,6 +200,7 @@ def validate_services() -> None:
         "services/feed_ingestor": "news-feed-ingestor",
         "services/article_fetcher": "news-article-fetcher",
         "services/article_extractor": "news-article-extractor",
+        "services/dlq_operator": "news-dlq-operator",
     }
     for package_dir, expected_name in package_names.items():
         pyproject_path = SERVICES_ROOT / package_dir / "pyproject.toml"
@@ -366,6 +368,7 @@ def validate_uv_projects() -> None:
         SERVICES_ROOT / "services" / "feed_ingestor" / "Dockerfile",
         SERVICES_ROOT / "services" / "article_fetcher" / "Dockerfile",
         SERVICES_ROOT / "services" / "article_extractor" / "Dockerfile",
+        SERVICES_ROOT / "services" / "dlq_operator" / "Dockerfile",
     ]
     for path in python_dockerfiles:
         dockerfile = path.read_text(encoding="utf-8")

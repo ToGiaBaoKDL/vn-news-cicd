@@ -71,3 +71,15 @@ images:
       package_dir: services/article_extractor
       additional_contexts:
         vn-news-platform-lib: vn-news-platform-lib
+
+  service_dlq_operator:
+    image_repository: vn-news-dlq-operator
+    build:
+      type: python_package
+      context: vn-news-services
+      repo: vn-news-services
+      dockerfile: services/dlq_operator/Dockerfile
+      package_name: news-dlq-operator
+      package_dir: services/dlq_operator
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib
