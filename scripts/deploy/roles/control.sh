@@ -19,4 +19,5 @@ deploy_control_role() {
   bootstrap_event_bus
   bootstrap_storage
   deploy_app
+  configure_host_operations
 }

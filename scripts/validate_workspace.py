@@ -401,6 +401,23 @@ def validate_compose_healthchecks() -> None:
             raise ValueError(msg)
 
 
+def validate_recovery_controls() -> None:
+    required_scripts = {
+        "scripts/configure_host_operations.sh",
+        "scripts/export_recovery.sh",
+        "scripts/publish_host_metrics.sh",
+        "scripts/verify_recovery_restore.sh",
+    }
+    missing_scripts = sorted(path for path in required_scripts if not (INFRA_ROOT / path).is_file())
+    if missing_scripts:
+        raise ValueError(f"vn-news-infra missing recovery scripts: {missing_scripts}")
+
+    for role in ("data", "control"):
+        env_template = INFRA_ROOT / "env" / f"{role}.env.example"
+        if "VN_NEWS_RECOVERY_BUCKET=" not in env_template.read_text(encoding="utf-8"):
+            raise ValueError(f"{env_template} must configure VN_NEWS_RECOVERY_BUCKET")
+
+
 def validate_event_contracts(config: dict) -> None:
     configured_topics = set(config["event_bus"]["topics"])
     contract_topic_keys = set(EVENT_TOPIC_KEYS)
@@ -428,6 +445,7 @@ def main() -> None:
     validate_settings_consistency(config)
     validate_platform_services(config)
     validate_compose_healthchecks()
+    validate_recovery_controls()
     validate_source_filenames()
     validate_platform_lib_package()
     validate_uv_projects()

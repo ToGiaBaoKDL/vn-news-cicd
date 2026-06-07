@@ -82,6 +82,10 @@ materialize_runtime_secrets() {
   sudo bash -lc "set -euo pipefail; set -a; source '$env_file'; set +a; '$infra_root/scripts/materialize_runtime_secrets.sh' '$role'"
 }
 
+configure_host_operations() {
+  sudo "$infra_root/scripts/configure_host_operations.sh" "$role" "$deploy_root"
+}
+
 compose_data() {
   docker compose --env-file "$env_file" -f "$infra_root/compose.data.yaml" "$@"
 }

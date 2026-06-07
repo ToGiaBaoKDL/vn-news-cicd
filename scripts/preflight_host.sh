@@ -49,6 +49,7 @@ check_disk_usage /
 
 case "$role" in
   data)
+    grep -q '^VN_NEWS_RECOVERY_BUCKET=' "$env_file" || fail "VN_NEWS_RECOVERY_BUCKET is not configured"
     require_command mountpoint
     mountpoint -q /srv/vn-news-data || fail "/srv/vn-news-data is not mounted"
     require_directory /srv/vn-news-data/redpanda
@@ -56,6 +57,7 @@ case "$role" in
     check_disk_usage /srv/vn-news-data
     ;;
   control)
+    grep -q '^VN_NEWS_RECOVERY_BUCKET=' "$env_file" || fail "VN_NEWS_RECOVERY_BUCKET is not configured"
     require_directory /srv/vn-news-control/airflow-db
     require_directory /srv/vn-news-control/airflow-dag-bundles
     require_directory /srv/vn-news-control/airflow-logs
