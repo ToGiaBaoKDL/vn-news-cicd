@@ -61,6 +61,27 @@ load_role_env() {
 
   export VN_NEWS_RELEASE_TAG="$release_tag"
   export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
+  load_image_env
+}
+
+load_image_env() {
+  local images_manifest="$cicd_root/images.yaml"
+  local registry namespace
+
+  if [[ ! -f "$images_manifest" ]]; then
+    echo "Missing image manifest: $images_manifest" >&2
+    exit 1
+  fi
+
+  registry="$(awk -F': *' '$1 == "registry" {print $2; exit}' "$images_manifest")"
+  namespace="$(awk -F': *' '$1 == "namespace" {print $2; exit}' "$images_manifest")"
+  export VN_NEWS_IMAGE_REGISTRY="${VN_NEWS_IMAGE_REGISTRY:-$registry}"
+  export VN_NEWS_IMAGE_NAMESPACE="${VN_NEWS_IMAGE_NAMESPACE:-$namespace}"
+
+  if [[ -z "$VN_NEWS_IMAGE_REGISTRY" || -z "$VN_NEWS_IMAGE_NAMESPACE" ]]; then
+    echo "Image registry and namespace are required in $images_manifest" >&2
+    exit 1
+  fi
 }
 
 set_role_env_value() {

@@ -49,6 +49,7 @@ def main() -> None:
     for topic in config["event_bus"]["topics"].values():
         topic_name = topic["name"]
         retention_ms = topic["retention_ms"]
+        retention_bytes = topic["retention_bytes"]
         run(
             rpk_command(
                 prefix,
@@ -60,6 +61,8 @@ def main() -> None:
                 str(topic["partitions"]),
                 "--topic-config",
                 f"retention.ms={retention_ms}",
+                "--topic-config",
+                f"retention.bytes={retention_bytes}",
                 brokers=brokers,
             ),
             dry_run=args.dry_run,
@@ -72,6 +75,8 @@ def main() -> None:
                 topic_name,
                 "--set",
                 f"retention.ms={retention_ms}",
+                "--set",
+                f"retention.bytes={retention_bytes}",
                 "--no-confirm",
                 brokers=brokers,
             ),
