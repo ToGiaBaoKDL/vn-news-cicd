@@ -1,0 +1,12 @@
+version = 1
+release_tag = "0.2.19"
+image_tag = "0.2.19"
+
+[repositories]
+vn-news-cicd = "c0fb20baa2b7b6c9b9d7baea12d842fdd14fd735"
+vn-news-app = "a001943425725bf91ba4deed38cb0376e93858fa"
+vn-news-config = "f1c024420f98426daa9be9323f37725c0d41aa33"
+vn-news-infra = "49f602fdc590c07fcc1e4dbd8c388ad395ff75b1"
+vn-news-orchestration = "f123ff93ffe397fa6cd71aadf263d0bb2cf8cbfc"
+vn-news-platform-lib = "263e2ead795309be282b9a842d287805d85c23e4"
+vn-news-services = "d468414d7593debe1b7ad792c6d21b5cd11f2479"
