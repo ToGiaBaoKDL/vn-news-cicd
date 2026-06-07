@@ -14,6 +14,7 @@ def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypa
                     "name": "vn.news.feed_item.discovered",
                     "partitions": 3,
                     "retention_ms": 604800000,
+                    "retention_bytes": 268435456,
                 }
             },
         }
@@ -60,6 +61,8 @@ def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypa
         "3",
         "--topic-config",
         "retention.ms=604800000",
+        "--topic-config",
+        "retention.bytes=268435456",
         "-X",
         "brokers=redpanda:9092",
     ]
@@ -70,6 +73,8 @@ def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypa
         "vn.news.feed_item.discovered",
         "--set",
         "retention.ms=604800000",
+        "--set",
+        "retention.bytes=268435456",
         "--no-confirm",
         "-X",
         "brokers=redpanda:9092",
