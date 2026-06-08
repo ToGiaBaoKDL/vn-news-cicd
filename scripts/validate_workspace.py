@@ -112,6 +112,28 @@ def validate_platform_services(config: dict) -> None:
         raise ValueError(msg)
 
 
+def validate_cloudflare_access() -> None:
+    cloudflare_root = INFRA_ROOT / "access" / "cloudflare"
+    required_files = {
+        "compose.control.yaml",
+        "compose.data.yaml",
+    }
+    missing_files = sorted(
+        path for path in required_files if not (cloudflare_root / path).is_file()
+    )
+    if missing_files:
+        raise ValueError(f"vn-news-infra missing Cloudflare access files: {missing_files}")
+    for filename in required_files:
+        compose = load_yaml(cloudflare_root / filename)
+        for service_name, service in compose.get("services", {}).items():
+            image = service.get("image", "")
+            if ":latest" in image:
+                raise ValueError(f"{service_name} must not use a latest cloudflared image")
+            command = service.get("command", [])
+            if "--token-file" not in command:
+                raise ValueError(f"{service_name} must read tunnel tokens from a secret file")
+
+
 def validate_source_filenames() -> None:
     for path in sorted((CONFIG_DIR / "sources").glob("*.yaml")):
         source = load_yaml(path)
@@ -447,6 +469,7 @@ def main() -> None:
     enabled_feeds = sum(len(source["feed_discovery"]["feeds"]) for source in enabled_sources)
     validate_settings_consistency(config)
     validate_platform_services(config)
+    validate_cloudflare_access()
     validate_compose_healthchecks()
     validate_recovery_controls()
     validate_source_filenames()

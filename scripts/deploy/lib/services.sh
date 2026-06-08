@@ -11,6 +11,11 @@ deploy_seaweedfs() {
   compose_data up -d --wait seaweedfs-s3
 }
 
+deploy_data_access() {
+  compose_data pull cloudflared-data
+  compose_data up -d --wait cloudflared-data
+}
+
 deploy_airflow() {
   compose_control pull airflow-db docker-socket-proxy airflow-scheduler airflow-dag-processor airflow-api-server
   compose_control up -d --wait airflow-db
@@ -23,6 +28,11 @@ deploy_app() {
 
   docker compose --env-file "$env_file" -f "$app_root/compose.yaml" pull
   docker compose --env-file "$env_file" -f "$app_root/compose.yaml" up -d --wait
+}
+
+deploy_control_access() {
+  compose_control pull cloudflared-control
+  compose_control up -d --wait cloudflared-control
 }
 
 deploy_workers() {
