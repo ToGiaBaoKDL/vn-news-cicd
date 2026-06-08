@@ -132,6 +132,25 @@ def validate_cloudflare_access() -> None:
             command = service.get("command", [])
             if "--token-file" not in command:
                 raise ValueError(f"{service_name} must read tunnel tokens from a secret file")
+            token_index = command.index("--token-file") + 1
+            if token_index >= len(command):
+                raise ValueError(f"{service_name} must set a token file path")
+            token_path = command[token_index]
+            volumes = service.get("volumes", [])
+            token_mount = next(
+                (
+                    volume
+                    for volume in volumes
+                    if isinstance(volume, dict) and volume.get("target") == token_path
+                ),
+                None,
+            )
+            if token_mount is None:
+                raise ValueError(f"{service_name} must bind mount its token file")
+            if token_mount.get("read_only") is not True:
+                raise ValueError(f"{service_name} token file mount must be read-only")
+            if token_mount.get("bind", {}).get("create_host_path") is not False:
+                raise ValueError(f"{service_name} token file mount must not create host paths")
 
 
 def validate_source_filenames() -> None:
