@@ -44,7 +44,6 @@ docker info >/dev/null 2>&1 || fail "Docker daemon is unavailable"
 sudo -n true >/dev/null 2>&1 || fail "passwordless sudo is unavailable"
 [[ -r "$env_file" ]] || fail "host configuration is not readable: $env_file"
 [[ "$(stat -c '%a' "$env_file")" == "640" ]] || fail "$env_file must have mode 640"
-require_directory /run/vn-news/secrets
 check_disk_usage /
 
 case "$role" in
