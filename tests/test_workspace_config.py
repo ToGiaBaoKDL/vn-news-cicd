@@ -67,3 +67,4 @@ def test_publish_workflow_enables_github_actions_build_cache() -> None:
     workflow = Path(".github/workflows/publish-images.yaml").read_text(encoding="utf-8")
 
     assert "--github-actions-cache" in workflow
+    assert "crazy-max/ghaction-github-runtime@" in workflow
