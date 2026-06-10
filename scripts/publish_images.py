@@ -4,9 +4,9 @@ import argparse
 import shlex
 import subprocess
 
-from scripts.build_images import image_command, load_yaml
+from scripts.build_images import image_command
+from scripts.image_catalog import image_reference, load_image_catalog
 from scripts.release_tags import validate_tag
-from scripts.verify_images import CICD_ROOT, image_reference
 
 
 def parse_csv(value: str | None) -> list[str]:
@@ -43,7 +43,7 @@ def publish_images(
     github_actions_cache: bool,
     dry_run: bool,
 ) -> None:
-    catalog = load_yaml(CICD_ROOT / "images.yaml")
+    catalog = load_image_catalog()
     validate_tag(tag, push=push)
     if from_tag:
         validate_tag(from_tag, push=True)

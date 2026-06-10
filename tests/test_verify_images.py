@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from scripts.verify_images import image_reference, manifest_platforms, verify_image
+from scripts.image_catalog import image_reference
+from scripts.verify_images import manifest_platforms, verify_image
 
 
 def test_image_reference_uses_catalog_identity() -> None:

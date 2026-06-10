@@ -3,18 +3,9 @@ from __future__ import annotations
 import argparse
 import shlex
 import subprocess
-from pathlib import Path
 
-import yaml
-
+from scripts.image_catalog import WORKSPACE_ROOT, image_reference, load_image_catalog
 from scripts.release_tags import validate_tag
-
-CICD_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = CICD_ROOT.parent
-
-
-def load_yaml(path: Path) -> dict:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,7 +35,7 @@ def image_command(
         "--file",
         str(context / build["dockerfile"]),
         "--tag",
-        f"{catalog['registry']}/{catalog['namespace']}/{image['image_repository']}:{tag}",
+        image_reference(catalog, image_key, tag),
     ]
     platforms = catalog.get("platforms", [])
     if push and platforms:
@@ -68,7 +59,7 @@ def image_command(
 
 def main() -> None:
     args = parse_args()
-    catalog = load_yaml(CICD_ROOT / "images.yaml")
+    catalog = load_image_catalog()
     validate_tag(args.tag, push=args.push)
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))

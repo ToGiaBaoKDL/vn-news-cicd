@@ -3,22 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from pathlib import Path
 
-import yaml
-
+from scripts.image_catalog import image_reference, load_image_catalog
 from scripts.release_tags import validate_tag
-
-CICD_ROOT = Path(__file__).resolve().parents[1]
-
-
-def load_catalog() -> dict:
-    return yaml.safe_load((CICD_ROOT / "images.yaml").read_text(encoding="utf-8")) or {}
-
-
-def image_reference(catalog: dict, image_key: str, tag: str) -> str:
-    image = catalog["images"][image_key]
-    return f"{catalog['registry']}/{catalog['namespace']}/{image['image_repository']}:{tag}"
 
 
 def manifest_platforms(manifest: dict) -> set[str]:
@@ -61,7 +48,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     validate_tag(args.tag, push=True)
-    catalog = load_catalog()
+    catalog = load_image_catalog()
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))
     if unknown_images:

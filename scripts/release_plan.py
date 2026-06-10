@@ -4,10 +4,8 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
+from scripts.image_catalog import load_image_catalog
 from scripts.release_manifest import (
-    CICD_ROOT,
     ReleaseManifest,
     load_release_manifest,
     resolve_release_manifest,
@@ -24,11 +22,6 @@ class ReleasePlan:
     deploy_data: bool
     deploy_control: bool
     deploy_processing: bool
-
-
-def load_catalog(path: Path | None = None) -> dict:
-    catalog_path = path or CICD_ROOT / "images.yaml"
-    return yaml.safe_load(catalog_path.read_text(encoding="utf-8")) or {}
 
 
 def image_dependencies(image: dict) -> set[str]:
@@ -226,7 +219,7 @@ def main() -> None:
     plan = create_release_plan(
         current_manifest_path=current_manifest_path,
         base_manifest_path=base_manifest_path,
-        catalog=load_catalog(),
+        catalog=load_image_catalog(),
     )
     if args.github_output:
         write_github_output(plan, args.github_output)
