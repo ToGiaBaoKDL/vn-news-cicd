@@ -465,6 +465,13 @@ def validate_release_identity_usage() -> None:
         if variable not in deploy_script:
             raise ValueError(f"deploy_production.sh must pass {variable}")
 
+    deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
+        encoding="utf-8"
+    )
+    for variable in ("VN_NEWS_IMAGE_REGISTRY", "VN_NEWS_IMAGE_NAMESPACE"):
+        if f"set_role_env_value {variable}" not in deploy_context:
+            raise ValueError(f"deployment context must persist {variable}")
+
 
 def validate_recovery_controls() -> None:
     required_scripts = {

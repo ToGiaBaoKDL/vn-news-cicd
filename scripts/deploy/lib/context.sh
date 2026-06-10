@@ -100,6 +100,10 @@ prepare_deploy_context() {
   load_role_env
   set_role_env_value VN_NEWS_RELEASE_TAG "$release_tag"
   set_role_env_value VN_NEWS_IMAGE_TAG "$image_tag"
+  if [[ "$role" != "data" ]]; then
+    set_role_env_value VN_NEWS_IMAGE_REGISTRY "$VN_NEWS_IMAGE_REGISTRY"
+    set_role_env_value VN_NEWS_IMAGE_NAMESPACE "$VN_NEWS_IMAGE_NAMESPACE"
+  fi
   echo "deployment context: role=$role release=$release_tag image=$image_tag"
 }
 
