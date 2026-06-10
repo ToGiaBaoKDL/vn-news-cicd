@@ -146,7 +146,7 @@ jobs:
             < scripts/deploy_production.sh
 
   deploy-processing:
-    needs: [release, deploy-control]
+    needs: [release, deploy-data]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production

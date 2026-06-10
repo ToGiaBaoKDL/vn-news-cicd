@@ -125,7 +125,7 @@ jobs:
         working-directory: vn-news-cicd
         env:
           IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
-        run: uv run python -m scripts.build_images --tag "$IMAGE_TAG" --push
+        run: uv run python -m scripts.build_images --tag "$IMAGE_TAG" --push --github-actions-cache
 
       - name: Verify published images
         working-directory: vn-news-cicd

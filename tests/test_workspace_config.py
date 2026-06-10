@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import yaml
 from news_platform.config import load_settings
 from news_platform.ids import make_run_id, normalize_article_url
 from scripts.validate_workspace import validate_workflow_action_ref
@@ -52,3 +53,17 @@ def test_workflow_action_ref_rejects_tag() -> None:
         validate_workflow_action_ref(
             path=Path("workflow.yaml"), action="actions/checkout", ref="v6"
         )
+
+
+def test_processing_deploy_waits_for_data_not_control() -> None:
+    workflow = yaml.safe_load(
+        Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
+    )
+
+    assert set(workflow["jobs"]["deploy-processing"]["needs"]) == {"release", "deploy-data"}
+
+
+def test_publish_workflow_enables_github_actions_build_cache() -> None:
+    workflow = Path(".github/workflows/publish-images.yaml").read_text(encoding="utf-8")
+
+    assert "--github-actions-cache" in workflow

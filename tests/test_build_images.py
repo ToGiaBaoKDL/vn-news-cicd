@@ -66,3 +66,30 @@ def test_local_image_load_does_not_use_multi_platforms() -> None:
 
     assert "--platform" not in command
     assert "--load" in command
+
+
+def test_cached_build_uses_image_scoped_github_actions_cache() -> None:
+    catalog = {
+        "registry": "docker.io",
+        "namespace": "example",
+        "images": {
+            "article_fetcher": {
+                "image_repository": "vn-news-article-fetcher",
+                "build": {
+                    "context": "vn-news-services",
+                    "dockerfile": "services/article_fetcher/Dockerfile",
+                },
+            },
+        },
+    }
+
+    command = image_command(
+        catalog,
+        "article_fetcher",
+        "0.2.26",
+        push=True,
+        github_actions_cache=True,
+    )
+
+    assert "type=gha,scope=vn-news-article_fetcher" in command
+    assert "type=gha,mode=max,scope=vn-news-article_fetcher" in command
