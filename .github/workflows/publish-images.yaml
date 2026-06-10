@@ -8,6 +8,11 @@ on:
         required: true
         default: 0.2.7.toml
         type: string
+      base_release_manifest:
+        description: Optional base release manifest filename under releases/
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -47,6 +52,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
         run: uv run --no-project --python 3.12 python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
+
+      - name: Plan release actions
+        id: plan
+        working-directory: vn-news-cicd
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+          BASE_RELEASE_MANIFEST: ${{ inputs.base_release_manifest }}
+        run: |
+          uv run --no-project --with PyYAML python -m scripts.release_plan \
+            --manifest "$RELEASE_MANIFEST" \
+            --base-manifest "$BASE_RELEASE_MANIFEST" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Check out pinned CI/CD
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -128,7 +145,17 @@ jobs:
         working-directory: vn-news-cicd
         env:
           IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
-        run: uv run python -m scripts.build_images --tag "$IMAGE_TAG" --push --github-actions-cache
+          BASE_IMAGE_TAG: ${{ steps.plan.outputs.base_image_tag }}
+          BUILD_IMAGES: ${{ steps.plan.outputs.build_images }}
+          COPY_IMAGES: ${{ steps.plan.outputs.copy_images }}
+        run: |
+          uv run python -m scripts.publish_images \
+            --tag "$IMAGE_TAG" \
+            --from-tag "$BASE_IMAGE_TAG" \
+            --build-images "$BUILD_IMAGES" \
+            --copy-images "$COPY_IMAGES" \
+            --push \
+            --github-actions-cache
 
       - name: Verify published images
         working-directory: vn-news-cicd

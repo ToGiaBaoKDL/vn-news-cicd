@@ -88,3 +88,5 @@ def test_publish_workflow_enables_github_actions_build_cache() -> None:
 
     assert "--github-actions-cache" in workflow
     assert "crazy-max/ghaction-github-runtime@" in workflow
+    assert "python -m scripts.publish_images" in workflow
+    assert "python -m scripts.build_images --tag" not in workflow
