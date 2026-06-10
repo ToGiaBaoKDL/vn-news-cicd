@@ -7,7 +7,10 @@ import pytest
 import yaml
 from news_platform.config import load_settings
 from news_platform.ids import make_run_id, normalize_article_url
-from scripts.validate_workspace import validate_workflow_action_ref
+from scripts.validate_workspace import (
+    validate_release_identity_usage,
+    validate_workflow_action_ref,
+)
 
 
 def test_bucket_suffixes_are_unique() -> None:
@@ -61,6 +64,23 @@ def test_processing_deploy_waits_for_data_not_control() -> None:
     )
 
     assert set(workflow["jobs"]["deploy-processing"]["needs"]) == {"release", "deploy-data"}
+
+
+def test_deploy_uses_distinct_release_and_image_tags() -> None:
+    workflow = yaml.safe_load(
+        Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
+    )
+
+    for job_name in ("deploy-data", "deploy-control", "deploy-processing"):
+        deploy_step = next(
+            step
+            for step in workflow["jobs"][job_name]["steps"]
+            if step["name"].startswith("Deploy ")
+        )
+        assert deploy_step["env"]["RELEASE_TAG"] == "${{ needs.release.outputs.release_tag }}"
+        assert deploy_step["env"]["IMAGE_TAG"] == "${{ needs.release.outputs.image_tag }}"
+
+    validate_release_identity_usage()
 
 
 def test_publish_workflow_enables_github_actions_build_cache() -> None:

@@ -2,6 +2,7 @@
 
 role="${VN_NEWS_DEPLOY_ROLE:?VN_NEWS_DEPLOY_ROLE is required}"
 release_tag="${VN_NEWS_DEPLOY_RELEASE_TAG:?VN_NEWS_DEPLOY_RELEASE_TAG is required}"
+image_tag="${VN_NEWS_DEPLOY_IMAGE_TAG:?VN_NEWS_DEPLOY_IMAGE_TAG is required}"
 infra_ref="${VN_NEWS_DEPLOY_INFRA_REF:?VN_NEWS_DEPLOY_INFRA_REF is required}"
 config_ref="${VN_NEWS_DEPLOY_CONFIG_REF:-}"
 platform_lib_ref="${VN_NEWS_DEPLOY_PLATFORM_LIB_REF:-}"
@@ -60,6 +61,7 @@ load_role_env() {
   set +a
 
   export VN_NEWS_RELEASE_TAG="$release_tag"
+  export VN_NEWS_IMAGE_TAG="$image_tag"
   export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
   load_image_env
 }
@@ -97,6 +99,8 @@ prepare_deploy_context() {
   checkout_repo vn-news-infra "$infra_ref"
   load_role_env
   set_role_env_value VN_NEWS_RELEASE_TAG "$release_tag"
+  set_role_env_value VN_NEWS_IMAGE_TAG "$image_tag"
+  echo "deployment context: role=$role release=$release_tag image=$image_tag"
 }
 
 materialize_runtime_secrets() {

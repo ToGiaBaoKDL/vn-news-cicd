@@ -43,24 +43,25 @@ run_role() {
 prepare_streamed_deploy() {
   local role="${1:?role is required}"
   local release_tag="${2:?release tag is required}"
-  local infra_ref="${3:?infra ref is required}"
+  local image_tag="${3:?image tag is required}"
+  local infra_ref="${4:?infra ref is required}"
   local config_ref cicd_ref
 
   case "$role" in
     data)
       config_ref=""
-      cicd_ref="${4:-${VN_NEWS_CICD_REF:-main}}"
+      cicd_ref="${5:-${VN_NEWS_CICD_REF:-main}}"
       ;;
     control)
-      config_ref="${4:?config ref is required}"
-      cicd_ref="${5:?cicd ref is required}"
-      export VN_NEWS_DEPLOY_ORCHESTRATION_REF="${6:?orchestration ref is required}"
-      export VN_NEWS_DEPLOY_APP_REF="${7:?app ref is required}"
-      export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="${8:?platform lib ref is required}"
+      config_ref="${5:?config ref is required}"
+      cicd_ref="${6:?cicd ref is required}"
+      export VN_NEWS_DEPLOY_ORCHESTRATION_REF="${7:?orchestration ref is required}"
+      export VN_NEWS_DEPLOY_APP_REF="${8:?app ref is required}"
+      export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="${9:?platform lib ref is required}"
       ;;
     processing)
-      config_ref="${4:?config ref is required}"
-      cicd_ref="${5:-${VN_NEWS_CICD_REF:-main}}"
+      config_ref="${5:?config ref is required}"
+      cicd_ref="${6:-${VN_NEWS_CICD_REF:-main}}"
       ;;
     *)
       echo "Unknown deployment role: $role" >&2
@@ -74,6 +75,7 @@ prepare_streamed_deploy() {
   export VN_NEWS_DEPLOY_INTERNAL=1
   export VN_NEWS_DEPLOY_ROLE="$role"
   export VN_NEWS_DEPLOY_RELEASE_TAG="$release_tag"
+  export VN_NEWS_DEPLOY_IMAGE_TAG="$image_tag"
   export VN_NEWS_DEPLOY_INFRA_REF="$infra_ref"
   export VN_NEWS_DEPLOY_CONFIG_REF="$config_ref"
 

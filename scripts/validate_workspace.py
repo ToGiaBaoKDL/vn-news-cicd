@@ -445,6 +445,27 @@ def validate_compose_healthchecks() -> None:
             raise ValueError(msg)
 
 
+def validate_release_identity_usage() -> None:
+    compose_paths = [APP_ROOT / "compose.yaml", *INFRA_ROOT.rglob("compose*.yaml")]
+    for path in compose_paths:
+        content = path.read_text(encoding="utf-8")
+        if "${VN_NEWS_RELEASE_TAG" in content:
+            relative_path = path.relative_to(WORKSPACE_ROOT)
+            raise ValueError(f"{relative_path} must use VN_NEWS_IMAGE_TAG for images")
+
+    for role in ("data", "control", "processing"):
+        env_template = INFRA_ROOT / "env" / f"{role}.env.example"
+        content = env_template.read_text(encoding="utf-8")
+        for variable in ("VN_NEWS_RELEASE_TAG", "VN_NEWS_IMAGE_TAG"):
+            if content.count(f"{variable}=") != 1:
+                raise ValueError(f"{env_template} must define {variable} exactly once")
+
+    deploy_script = (CICD_ROOT / "scripts" / "deploy_production.sh").read_text(encoding="utf-8")
+    for variable in ("VN_NEWS_DEPLOY_RELEASE_TAG", "VN_NEWS_DEPLOY_IMAGE_TAG"):
+        if variable not in deploy_script:
+            raise ValueError(f"deploy_production.sh must pass {variable}")
+
+
 def validate_recovery_controls() -> None:
     required_scripts = {
         "scripts/configure_host_operations.sh",
@@ -490,6 +511,7 @@ def main() -> None:
     validate_platform_services(config)
     validate_cloudflare_access()
     validate_compose_healthchecks()
+    validate_release_identity_usage()
     validate_recovery_controls()
     validate_source_filenames()
     validate_platform_lib_package()

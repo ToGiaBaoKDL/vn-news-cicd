@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
       image_tag: ${{ steps.release.outputs.image_tag }}
       vn_news_app_ref: ${{ steps.release.outputs.vn_news_app_ref }}
       vn_news_cicd_ref: ${{ steps.release.outputs.vn_news_cicd_ref }}
@@ -94,12 +95,13 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
+          RELEASE_TAG: ${{ needs.release.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.release.outputs.image_tag }}
           INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
           CICD_REF: ${{ needs.release.outputs.vn_news_cicd_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            data "$RELEASE_TAG" "$INFRA_REF" "$CICD_REF" \
+            data "$RELEASE_TAG" "$IMAGE_TAG" "$INFRA_REF" "$CICD_REF" \
             < scripts/deploy_production.sh
 
   deploy-control:
@@ -133,7 +135,8 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
+          RELEASE_TAG: ${{ needs.release.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.release.outputs.image_tag }}
           INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.release.outputs.vn_news_config_ref }}
           CICD_REF: ${{ needs.release.outputs.vn_news_cicd_ref }}
@@ -142,7 +145,7 @@ jobs:
           PLATFORM_LIB_REF: ${{ needs.release.outputs.vn_news_platform_lib_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            control "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$ORCHESTRATION_REF" "$APP_REF" "$PLATFORM_LIB_REF" \
+            control "$RELEASE_TAG" "$IMAGE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$ORCHESTRATION_REF" "$APP_REF" "$PLATFORM_LIB_REF" \
             < scripts/deploy_production.sh
 
   deploy-processing:
@@ -176,11 +179,12 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          RELEASE_TAG: ${{ needs.release.outputs.image_tag }}
+          RELEASE_TAG: ${{ needs.release.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.release.outputs.image_tag }}
           INFRA_REF: ${{ needs.release.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.release.outputs.vn_news_config_ref }}
           CICD_REF: ${{ needs.release.outputs.vn_news_cicd_ref }}
         run: |
           ssh "$USER@$HOST" bash -s -- \
-            processing "$RELEASE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" \
+            processing "$RELEASE_TAG" "$IMAGE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" \
             < scripts/deploy_production.sh
