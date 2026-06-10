@@ -135,6 +135,37 @@ def test_release_plan_copies_images_for_config_only_release(tmp_path: Path) -> N
     assert plan.deploy_processing is True
 
 
+def test_release_plan_does_not_rebuild_images_for_cicd_only_release(
+    tmp_path: Path,
+) -> None:
+    base = write_manifest(
+        tmp_path,
+        "0.2.31.toml",
+        release_tag="0.2.31",
+        image_tag="0.2.31",
+    )
+    current = write_manifest(
+        tmp_path,
+        "0.2.32.toml",
+        release_tag="0.2.32",
+        image_tag="0.2.32",
+        overrides={"vn-news-cicd": "8" * 40},
+    )
+
+    plan = create_release_plan(
+        current_manifest_path=current,
+        base_manifest_path=base,
+        catalog=CATALOG,
+    )
+
+    assert plan.changed_repositories == ["vn-news-cicd"]
+    assert plan.build_images == []
+    assert plan.copy_images == sorted(CATALOG["images"])
+    assert plan.deploy_data is False
+    assert plan.deploy_control is False
+    assert plan.deploy_processing is False
+
+
 def test_release_plan_rejects_reused_image_tag_for_image_change(tmp_path: Path) -> None:
     base = write_manifest(
         tmp_path,

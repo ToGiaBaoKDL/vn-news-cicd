@@ -101,12 +101,7 @@ def planned_images(
         return [], []
 
     dependencies = image_dependency_map(catalog)
-    if "vn-news-cicd" in changed_repos:
-        build_images = image_keys
-    else:
-        build_images = [
-            image_key for image_key, repos in dependencies.items() if repos & changed_repos
-        ]
+    build_images = [image_key for image_key, repos in dependencies.items() if repos & changed_repos]
     copy_images = [image_key for image_key in image_keys if image_key not in set(build_images)]
     return build_images, copy_images
 
