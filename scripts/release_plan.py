@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from scripts.image_catalog import load_image_catalog
 from scripts.release_manifest import (
+    CICD_ROOT,
     ReleaseManifest,
     load_release_manifest,
     resolve_release_manifest,
@@ -76,11 +78,36 @@ def changed_repositories(
 ) -> list[str]:
     if base is None:
         return sorted(current.repositories)
-    return sorted(
-        repo_name
-        for repo_name, commit_ref in current.repositories.items()
-        if base.repositories.get(repo_name) != commit_ref
+    changed = []
+    for repo_name, commit_ref in current.repositories.items():
+        base_ref = base.repositories.get(repo_name)
+        if base_ref == commit_ref:
+            continue
+        if repo_name == "vn-news-cicd" and not repository_has_functional_changes(
+            repo_name,
+            base_ref,
+            commit_ref,
+        ):
+            continue
+        changed.append(repo_name)
+    return sorted(changed)
+
+
+def repository_has_functional_changes(
+    repo_name: str, base_ref: str | None, commit_ref: str
+) -> bool:
+    if repo_name != "vn-news-cicd" or not base_ref:
+        return True
+    result = subprocess.run(
+        ["git", "-C", str(CICD_ROOT), "diff", "--name-only", base_ref, commit_ref, "--"],
+        check=False,
+        capture_output=True,
+        text=True,
     )
+    if result.returncode != 0:
+        return True
+    changed_paths = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return any(not path.startswith("releases/") for path in changed_paths)
 
 
 def planned_images(
@@ -93,6 +120,9 @@ def planned_images(
     image_keys = sorted(catalog["images"])
     if base is None:
         return image_keys, []
+
+    if not changed_repos:
+        return [], []
 
     if current.image_tag == base.image_tag:
         if image_repositories_changed(catalog, changed_repos):

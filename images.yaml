@@ -72,6 +72,18 @@ images:
       additional_contexts:
         vn-news-platform-lib: vn-news-platform-lib
 
+  service_pipeline_metrics:
+    image_repository: vn-news-pipeline-metrics
+    build:
+      type: python_package
+      context: vn-news-services
+      repo: vn-news-services
+      dockerfile: services/pipeline_metrics/Dockerfile
+      package_name: news-pipeline-metrics
+      package_dir: services/pipeline_metrics
+      additional_contexts:
+        vn-news-platform-lib: vn-news-platform-lib
+
   service_dlq_operator:
     image_repository: vn-news-dlq-operator
     build:

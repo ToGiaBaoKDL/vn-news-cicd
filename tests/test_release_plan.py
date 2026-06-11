@@ -166,6 +166,42 @@ def test_release_plan_does_not_rebuild_images_for_cicd_only_release(
     assert plan.deploy_processing is False
 
 
+def test_release_plan_ignores_cicd_manifest_only_change(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "scripts.release_plan.repository_has_functional_changes",
+        lambda repo_name, base_ref, commit_ref: False,
+    )
+    base = write_manifest(
+        tmp_path,
+        "0.2.31.toml",
+        release_tag="0.2.31",
+        image_tag="0.2.31",
+    )
+    current = write_manifest(
+        tmp_path,
+        "0.2.32.toml",
+        release_tag="0.2.32",
+        image_tag="0.2.32",
+        overrides={"vn-news-cicd": "8" * 40},
+    )
+
+    plan = create_release_plan(
+        current_manifest_path=current,
+        base_manifest_path=base,
+        catalog=CATALOG,
+    )
+
+    assert plan.changed_repositories == []
+    assert plan.build_images == []
+    assert plan.copy_images == []
+    assert plan.deploy_data is False
+    assert plan.deploy_control is False
+    assert plan.deploy_processing is False
+
+
 def test_release_plan_rejects_reused_image_tag_for_image_change(tmp_path: Path) -> None:
     base = write_manifest(
         tmp_path,

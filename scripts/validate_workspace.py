@@ -240,6 +240,7 @@ def validate_services() -> None:
         "services/feed_ingestor",
         "services/article_fetcher",
         "services/article_extractor",
+        "services/pipeline_metrics",
         "services/dlq_operator",
     ]
     if root_pyproject["tool"]["uv"]["workspace"]["members"] != expected_members:
@@ -251,6 +252,7 @@ def validate_services() -> None:
         "services/feed_ingestor": "news-feed-ingestor",
         "services/article_fetcher": "news-article-fetcher",
         "services/article_extractor": "news-article-extractor",
+        "services/pipeline_metrics": "news-pipeline-metrics",
         "services/dlq_operator": "news-dlq-operator",
     }
     for package_dir, expected_name in package_names.items():
@@ -419,6 +421,7 @@ def validate_uv_projects() -> None:
         SERVICES_ROOT / "services" / "feed_ingestor" / "Dockerfile",
         SERVICES_ROOT / "services" / "article_fetcher" / "Dockerfile",
         SERVICES_ROOT / "services" / "article_extractor" / "Dockerfile",
+        SERVICES_ROOT / "services" / "pipeline_metrics" / "Dockerfile",
         SERVICES_ROOT / "services" / "dlq_operator" / "Dockerfile",
     ]
     for path in python_dockerfiles:
@@ -500,6 +503,43 @@ def validate_recovery_controls() -> None:
             raise ValueError(f"{env_template} must configure VN_NEWS_RECOVERY_BUCKET")
 
 
+def terraform_local_string(text: str, name: str) -> str:
+    match = re.search(rf'^\s*{re.escape(name)}\s*=\s*"([^"]+)"\s*$', text, re.MULTILINE)
+    if not match:
+        raise ValueError(f"terraform/oci/locals.tf missing string local: {name}")
+    return match.group(1)
+
+
+def terraform_local_set(text: str, name: str) -> set[str]:
+    match = re.search(
+        rf"^\s*{re.escape(name)}\s*=\s*toset\(\[(?P<body>.*?)\]\)\s*$",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if not match:
+        raise ValueError(f"terraform/oci/locals.tf missing toset local: {name}")
+    return set(re.findall(r'"([^"]+)"', match.group("body")))
+
+
+def validate_pipeline_metrics(config: dict) -> None:
+    metrics = config["event_bus"].get("metrics")
+    if not metrics:
+        raise ValueError("event_bus.metrics must be configured")
+    processing = load_compose("compose.processing.yaml")
+    if "pipeline-metrics" not in processing["services"]:
+        raise ValueError("processing Compose must run pipeline-metrics")
+
+    locals_text = (INFRA_ROOT / "terraform" / "oci" / "locals.tf").read_text(encoding="utf-8")
+    if terraform_local_string(locals_text, "metric_namespace") != metrics["namespace"]:
+        raise ValueError("Terraform metric_namespace must match event_bus.metrics.namespace")
+    if terraform_local_set(locals_text, "pipeline_consumer_groups") != set(
+        metrics["consumer_lag_groups"]
+    ):
+        raise ValueError(
+            "Terraform pipeline_consumer_groups must match event_bus.metrics.consumer_lag_groups"
+        )
+
+
 def validate_event_contracts(config: dict) -> None:
     configured_topics = set(config["event_bus"]["topics"])
     contract_topic_keys = set(EVENT_TOPIC_KEYS)
@@ -530,6 +570,7 @@ def main() -> None:
     validate_compose_healthchecks()
     validate_release_identity_usage()
     validate_recovery_controls()
+    validate_pipeline_metrics(config)
     validate_source_filenames()
     validate_platform_lib_package()
     validate_uv_projects()
