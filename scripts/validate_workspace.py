@@ -132,6 +132,16 @@ def validate_cloudflare_access() -> None:
             command = service.get("command", [])
             if "--token-file" not in command:
                 raise ValueError(f"{service_name} must read tunnel tokens from a secret file")
+            if "--metrics" not in command:
+                raise ValueError(f"{service_name} must expose cloudflared metrics explicitly")
+            metrics_index = command.index("--metrics") + 1
+            if metrics_index >= len(command):
+                raise ValueError(f"{service_name} must set a cloudflared metrics address")
+            metrics_address = command[metrics_index]
+            if not metrics_address.startswith(("127.0.0.1:", "localhost:")):
+                raise ValueError(
+                    f"{service_name} cloudflared metrics must bind to loopback: {metrics_address}"
+                )
             token_index = command.index("--token-file") + 1
             if token_index >= len(command):
                 raise ValueError(f"{service_name} must set a token file path")
