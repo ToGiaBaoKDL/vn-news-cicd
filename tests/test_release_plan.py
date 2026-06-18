@@ -102,6 +102,7 @@ def test_release_plan_builds_only_service_images_for_service_change(tmp_path: Pa
     assert plan.changed_repositories == ["vn-news-services"]
     assert plan.build_images == ["service_article_fetcher", "service_feed_ingestor"]
     assert plan.copy_images == ["app_api", "app_web", "infra_airflow_runtime"]
+    assert plan.publish_required is True
     assert plan.deploy_data is False
     assert plan.deploy_control is False
     assert plan.deploy_processing is True
@@ -130,7 +131,8 @@ def test_release_plan_copies_images_for_config_only_release(tmp_path: Path) -> N
 
     assert plan.build_images == []
     assert plan.copy_images == sorted(CATALOG["images"])
-    assert plan.deploy_data is False
+    assert plan.publish_required is True
+    assert plan.deploy_data is True
     assert plan.deploy_control is True
     assert plan.deploy_processing is True
 
@@ -161,9 +163,10 @@ def test_release_plan_does_not_rebuild_images_for_cicd_only_release(
     assert plan.changed_repositories == ["vn-news-cicd"]
     assert plan.build_images == []
     assert plan.copy_images == sorted(CATALOG["images"])
-    assert plan.deploy_data is False
-    assert plan.deploy_control is False
-    assert plan.deploy_processing is False
+    assert plan.publish_required is True
+    assert plan.deploy_data is True
+    assert plan.deploy_control is True
+    assert plan.deploy_processing is True
 
 
 def test_release_plan_ignores_cicd_manifest_only_change(
@@ -197,6 +200,7 @@ def test_release_plan_ignores_cicd_manifest_only_change(
     assert plan.changed_repositories == []
     assert plan.build_images == []
     assert plan.copy_images == []
+    assert plan.publish_required is False
     assert plan.deploy_data is False
     assert plan.deploy_control is False
     assert plan.deploy_processing is False

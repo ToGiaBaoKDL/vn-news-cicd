@@ -21,6 +21,7 @@ class ReleasePlan:
     changed_repositories: list[str]
     build_images: list[str]
     copy_images: list[str]
+    publish_required: bool
     deploy_data: bool
     deploy_control: bool
     deploy_processing: bool
@@ -145,10 +146,19 @@ def planned_roles(changed_repos: set[str], *, has_base: bool) -> tuple[bool, boo
     if not has_base:
         return True, True, True
 
-    deploy_data = "vn-news-infra" in changed_repos
+    deploy_data = bool(
+        {
+            "vn-news-cicd",
+            "vn-news-config",
+            "vn-news-infra",
+            "vn-news-platform-lib",
+        }
+        & changed_repos
+    )
     deploy_control = bool(
         {
             "vn-news-app",
+            "vn-news-cicd",
             "vn-news-config",
             "vn-news-infra",
             "vn-news-orchestration",
@@ -158,6 +168,7 @@ def planned_roles(changed_repos: set[str], *, has_base: bool) -> tuple[bool, boo
     )
     deploy_processing = bool(
         {
+            "vn-news-cicd",
             "vn-news-config",
             "vn-news-infra",
             "vn-news-platform-lib",
@@ -202,6 +213,7 @@ def create_release_plan(
         changed_repositories=changed,
         build_images=build_images,
         copy_images=copy_images,
+        publish_required=bool(build_images or copy_images),
         deploy_data=deploy_data,
         deploy_control=deploy_control,
         deploy_processing=deploy_processing,
@@ -219,6 +231,7 @@ def write_github_output(plan: ReleasePlan, path: Path) -> None:
         f"changed_repositories={csv(plan.changed_repositories)}",
         f"build_images={csv(plan.build_images)}",
         f"copy_images={csv(plan.copy_images)}",
+        f"publish_required={str(plan.publish_required).lower()}",
         f"deploy_data={str(plan.deploy_data).lower()}",
         f"deploy_control={str(plan.deploy_control).lower()}",
         f"deploy_processing={str(plan.deploy_processing).lower()}",
@@ -253,6 +266,7 @@ def main() -> None:
     print(f"changed_repositories={csv(plan.changed_repositories) or '(none)'}")
     print(f"build_images={csv(plan.build_images) or '(none)'}")
     print(f"copy_images={csv(plan.copy_images) or '(none)'}")
+    print(f"publish_required={str(plan.publish_required).lower()}")
     print(
         "deploy_roles="
         f"data:{str(plan.deploy_data).lower()},"

@@ -473,10 +473,10 @@ def validate_release_identity_usage() -> None:
             if content.count(f"{variable}=") != 1:
                 raise ValueError(f"{env_template} must define {variable} exactly once")
 
-    deploy_script = (CICD_ROOT / "scripts" / "deploy_production.sh").read_text(encoding="utf-8")
+    deploy_script = (CICD_ROOT / "scripts" / "deploy" / "production.sh").read_text(encoding="utf-8")
     for variable in ("VN_NEWS_DEPLOY_RELEASE_TAG", "VN_NEWS_DEPLOY_IMAGE_TAG"):
         if variable not in deploy_script:
-            raise ValueError(f"deploy_production.sh must pass {variable}")
+            raise ValueError(f"scripts/deploy/production.sh must pass {variable}")
 
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
@@ -501,6 +501,83 @@ def validate_recovery_controls() -> None:
         env_template = INFRA_ROOT / "env" / f"{role}.env.example"
         if "VN_NEWS_RECOVERY_BUCKET=" not in env_template.read_text(encoding="utf-8"):
             raise ValueError(f"{env_template} must configure VN_NEWS_RECOVERY_BUCKET")
+
+
+def validate_platform_bootstrap_boundary() -> None:
+    data_role = (CICD_ROOT / "scripts" / "deploy" / "roles" / "data.sh").read_text(encoding="utf-8")
+    control_role = (CICD_ROOT / "scripts" / "deploy" / "roles" / "control.sh").read_text(
+        encoding="utf-8"
+    )
+    workflow = (CICD_ROOT / ".github" / "workflows" / "release-production.yaml").read_text(
+        encoding="utf-8"
+    )
+    release_plan = (CICD_ROOT / "scripts" / "release_plan.py").read_text(encoding="utf-8")
+
+    for action in ("bootstrap_event_bus", "bootstrap_storage"):
+        if action not in data_role:
+            raise ValueError(f"data role must run {action}")
+        if action in control_role:
+            raise ValueError(f"control role must not run {action}")
+    for variable in ("CONFIG_REF", "PLATFORM_LIB_REF"):
+        if variable not in workflow:
+            raise ValueError(f"data deploy workflow must pass {variable}")
+    for repo_name in ("vn-news-cicd", "vn-news-config", "vn-news-platform-lib"):
+        if repo_name not in release_plan:
+            raise ValueError(f"release plan must deploy data for {repo_name} changes")
+
+
+def validate_runtime_secret_boundaries() -> None:
+    env_by_role = {
+        role: (INFRA_ROOT / "env" / f"{role}.env.example").read_text(encoding="utf-8")
+        for role in ("data", "control", "processing")
+    }
+    materializer = (INFRA_ROOT / "scripts" / "materialize_runtime_secrets.sh").read_text(
+        encoding="utf-8"
+    )
+    credential_helper = (INFRA_ROOT / "scripts" / "get_service_credential.sh").read_text(
+        encoding="utf-8"
+    )
+    creator = (INFRA_ROOT / "scripts" / "create_runtime_secrets.py").read_text(encoding="utf-8")
+    cloudflare_secret_sync = (
+        INFRA_ROOT / "scripts" / "sync_cloudflare_tunnel_secrets.py"
+    ).read_text(encoding="utf-8")
+    tfvars_helper = INFRA_ROOT / "scripts" / "runtime_secret_tfvars.py"
+
+    if "VN_NEWS_STORAGE_ADMIN_S3_CREDENTIALS_SECRET_OCID" not in env_by_role["data"]:
+        raise ValueError("data env must own storage admin S3 credentials")
+    if "VN_NEWS_STORAGE_ADMIN_S3_CREDENTIALS_SECRET_OCID" in env_by_role["control"]:
+        raise ValueError("control env must not own storage admin S3 credentials")
+    if "VN_NEWS_CURATED_WRITER_S3_CREDENTIALS_SECRET_OCID" not in env_by_role["processing"]:
+        raise ValueError("processing env must define curated-writer S3 credentials")
+    for token in (
+        "cleanup_stale_managed_secrets",
+        "curated-writer-s3-credentials",
+        "storage-admin-s3-credentials",
+    ):
+        if token not in materializer:
+            raise ValueError(f"runtime secret materializer missing {token}")
+    for token in ("curated_writer_s3_credentials", "vn-news-curated-writer"):
+        if token not in creator:
+            raise ValueError(f"runtime secret creator missing {token}")
+    if not tfvars_helper.is_file():
+        raise ValueError("runtime secret tfvars helper is missing")
+    for script_name, script in {
+        "create_runtime_secrets.py": creator,
+        "sync_cloudflare_tunnel_secrets.py": cloudflare_secret_sync,
+    }.items():
+        if "from runtime_secret_tfvars import merge_runtime_secret_ocids" not in script:
+            raise ValueError(f"{script_name} must use shared runtime secret tfvars helper")
+        if "def render_runtime_secret_ocids" in script:
+            raise ValueError(f"{script_name} must not duplicate runtime secret tfvars rendering")
+    for token in (
+        'data_host="${VN_NEWS_DATA_SSH_HOST:-tgb-data-1}"',
+        'processing_host="${VN_NEWS_PROCESSING_SSH_HOST:-tgb-processing-1}"',
+        "seaweedfs-curated-writer",
+        'host="$data_host"',
+        'host="$processing_host"',
+    ):
+        if token not in credential_helper:
+            raise ValueError(f"service credential helper missing {token}")
 
 
 def terraform_local_string(text: str, name: str) -> str:
@@ -576,6 +653,8 @@ def main() -> None:
     validate_compose_healthchecks()
     validate_release_identity_usage()
     validate_recovery_controls()
+    validate_platform_bootstrap_boundary()
+    validate_runtime_secret_boundaries()
     validate_pipeline_metrics(config)
     validate_source_filenames()
     validate_platform_lib_package()

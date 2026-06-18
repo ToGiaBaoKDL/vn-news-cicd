@@ -60,15 +60,19 @@ def test_workflow_action_ref_rejects_tag() -> None:
 
 def test_processing_deploy_waits_for_data_not_control() -> None:
     workflow = yaml.safe_load(
-        Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
+        Path(".github/workflows/release-production.yaml").read_text(encoding="utf-8")
     )
 
-    assert set(workflow["jobs"]["deploy-processing"]["needs"]) == {"release", "deploy-data"}
+    assert set(workflow["jobs"]["deploy-processing"]["needs"]) == {
+        "plan",
+        "verify-images",
+        "deploy-data",
+    }
 
 
 def test_deploy_uses_distinct_release_and_image_tags() -> None:
     workflow = yaml.safe_load(
-        Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
+        Path(".github/workflows/release-production.yaml").read_text(encoding="utf-8")
     )
 
     for job_name in ("deploy-data", "deploy-control", "deploy-processing"):
@@ -77,15 +81,16 @@ def test_deploy_uses_distinct_release_and_image_tags() -> None:
             for step in workflow["jobs"][job_name]["steps"]
             if step["name"].startswith("Deploy ")
         )
-        assert deploy_step["env"]["RELEASE_TAG"] == "${{ needs.release.outputs.release_tag }}"
-        assert deploy_step["env"]["IMAGE_TAG"] == "${{ needs.release.outputs.image_tag }}"
+        assert deploy_step["env"]["RELEASE_TAG"] == "${{ needs.plan.outputs.release_tag }}"
+        assert deploy_step["env"]["IMAGE_TAG"] == "${{ needs.plan.outputs.image_tag }}"
 
     validate_release_identity_usage()
 
 
-def test_publish_workflow_enables_github_actions_build_cache() -> None:
-    workflow = Path(".github/workflows/publish-images.yaml").read_text(encoding="utf-8")
+def test_release_workflow_enables_github_actions_build_cache() -> None:
+    workflow = Path(".github/workflows/release-production.yaml").read_text(encoding="utf-8")
 
+    assert "publish_required" in workflow
     assert "--github-actions-cache" in workflow
     assert "crazy-max/ghaction-github-runtime@" in workflow
     assert "python -m scripts.publish_images" in workflow

@@ -20,12 +20,12 @@ run_role() {
   local script_dir
 
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  source "$script_dir/deploy/lib/context.sh"
-  source "$script_dir/deploy/lib/services.sh"
-  source "$script_dir/deploy/lib/bootstrap_actions.sh"
-  source "$script_dir/deploy/roles/data.sh"
-  source "$script_dir/deploy/roles/control.sh"
-  source "$script_dir/deploy/roles/processing.sh"
+  source "$script_dir/lib/context.sh"
+  source "$script_dir/lib/services.sh"
+  source "$script_dir/lib/bootstrap_actions.sh"
+  source "$script_dir/roles/data.sh"
+  source "$script_dir/roles/control.sh"
+  source "$script_dir/roles/processing.sh"
 
   prepare_deploy_context
 
@@ -49,8 +49,9 @@ prepare_streamed_deploy() {
 
   case "$role" in
     data)
-      config_ref=""
-      cicd_ref="${5:-${VN_NEWS_CICD_REF:-main}}"
+      config_ref="${5:?config ref is required}"
+      cicd_ref="${6:?cicd ref is required}"
+      export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="${7:?platform lib ref is required}"
       ;;
     control)
       config_ref="${5:?config ref is required}"
@@ -79,7 +80,7 @@ prepare_streamed_deploy() {
   export VN_NEWS_DEPLOY_INFRA_REF="$infra_ref"
   export VN_NEWS_DEPLOY_CONFIG_REF="$config_ref"
 
-  exec bash "$repos_root/vn-news-cicd/scripts/deploy_production.sh"
+  exec bash "$repos_root/vn-news-cicd/scripts/deploy/production.sh"
 }
 
 if [[ "${VN_NEWS_DEPLOY_INTERNAL:-0}" == "1" ]]; then

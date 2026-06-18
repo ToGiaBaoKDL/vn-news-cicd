@@ -1,0 +1,339 @@
+name: Release Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_manifest:
+        description: Release manifest filename under releases/
+        required: true
+        default: 0.2.8.toml
+        type: string
+      base_release_manifest:
+        description: Optional base release manifest filename under releases/
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      image_tag: ${{ steps.release.outputs.image_tag }}
+      vn_news_app_ref: ${{ steps.release.outputs.vn_news_app_ref }}
+      vn_news_cicd_ref: ${{ steps.release.outputs.vn_news_cicd_ref }}
+      vn_news_config_ref: ${{ steps.release.outputs.vn_news_config_ref }}
+      vn_news_infra_ref: ${{ steps.release.outputs.vn_news_infra_ref }}
+      vn_news_orchestration_ref: ${{ steps.release.outputs.vn_news_orchestration_ref }}
+      vn_news_platform_lib_ref: ${{ steps.release.outputs.vn_news_platform_lib_ref }}
+      vn_news_services_ref: ${{ steps.release.outputs.vn_news_services_ref }}
+      base_image_tag: ${{ steps.plan.outputs.base_image_tag }}
+      build_images: ${{ steps.plan.outputs.build_images }}
+      copy_images: ${{ steps.plan.outputs.copy_images }}
+      publish_required: ${{ steps.plan.outputs.publish_required }}
+      deploy_data: ${{ steps.plan.outputs.deploy_data }}
+      deploy_control: ${{ steps.plan.outputs.deploy_control }}
+      deploy_processing: ${{ steps.plan.outputs.deploy_processing }}
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.17"
+          python-version: "3.12"
+
+      - name: Read release manifest
+        id: release
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate release refs
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+        run: python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
+
+      - name: Plan release actions
+        id: plan
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest }}
+          BASE_RELEASE_MANIFEST: ${{ inputs.base_release_manifest }}
+        run: |
+          uv run --no-project --with PyYAML python -m scripts.release_plan \
+            --manifest "$RELEASE_MANIFEST" \
+            --base-manifest "$BASE_RELEASE_MANIFEST" \
+            --github-output "$GITHUB_OUTPUT"
+
+  publish-images:
+    needs: plan
+    if: ${{ needs.plan.outputs.publish_required == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+          path: vn-news-cicd
+
+      - name: Check out app
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-app
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ needs.plan.outputs.vn_news_app_ref }}
+          path: vn-news-app
+
+      - name: Check out config
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-config
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ needs.plan.outputs.vn_news_config_ref }}
+          path: vn-news-config
+
+      - name: Check out infra
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-infra
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ needs.plan.outputs.vn_news_infra_ref }}
+          path: vn-news-infra
+
+      - name: Check out orchestration
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-orchestration
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ needs.plan.outputs.vn_news_orchestration_ref }}
+          path: vn-news-orchestration
+
+      - name: Check out platform library
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-platform-lib
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
+          path: vn-news-platform-lib
+
+      - name: Check out services
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-services
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          ref: ${{ needs.plan.outputs.vn_news_services_ref }}
+          path: vn-news-services
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.17"
+          python-version: "3.12"
+          working-directory: vn-news-cicd
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Expose GitHub Actions cache runtime
+        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+
+      - name: Validate assembled workspace
+        working-directory: vn-news-cicd
+        env:
+          VN_NEWS_CONFIG_DIR: ../vn-news-config/configs
+        run: |
+          uv sync --frozen --all-groups
+          uv lock --check
+          uv run python -m pytest
+          uv run python -m scripts.validate_workspace
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push images
+        working-directory: vn-news-cicd
+        env:
+          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          BASE_IMAGE_TAG: ${{ needs.plan.outputs.base_image_tag }}
+          BUILD_IMAGES: ${{ needs.plan.outputs.build_images }}
+          COPY_IMAGES: ${{ needs.plan.outputs.copy_images }}
+        run: |
+          uv run python -m scripts.publish_images \
+            --tag "$IMAGE_TAG" \
+            --from-tag "$BASE_IMAGE_TAG" \
+            --build-images "$BUILD_IMAGES" \
+            --copy-images "$COPY_IMAGES" \
+            --push \
+            --github-actions-cache
+
+  verify-images:
+    needs: [plan, publish-images]
+    if: ${{ always() && needs.plan.result == 'success' && (needs['publish-images'].result == 'success' || needs['publish-images'].result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.17"
+          python-version: "3.12"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Verify published images
+        env:
+          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+        run: uv run --no-project --with PyYAML python -m scripts.verify_images --tag "$IMAGE_TAG"
+
+  deploy-data:
+    needs: [plan, verify-images]
+    if: ${{ needs.plan.outputs.deploy_data == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Preflight data node
+        env:
+          HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+        run: ssh "$USER@$HOST" bash -s -- data < scripts/deploy/preflight_host.sh
+
+      - name: Deploy data node
+        env:
+          HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+          RELEASE_TAG: ${{ needs.plan.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          INFRA_REF: ${{ needs.plan.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ needs.plan.outputs.vn_news_config_ref }}
+          CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+          PLATFORM_LIB_REF: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
+        run: |
+          ssh "$USER@$HOST" bash -s -- \
+            data "$RELEASE_TAG" "$IMAGE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$PLATFORM_LIB_REF" \
+            < scripts/deploy/production.sh
+
+  deploy-control:
+    needs: [plan, verify-images, deploy-data]
+    if: ${{ always() && needs.plan.result == 'success' && needs['verify-images'].result == 'success' && (needs['deploy-data'].result == 'success' || needs['deploy-data'].result == 'skipped') && needs.plan.outputs.deploy_control == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Preflight control node
+        env:
+          HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+        run: ssh "$USER@$HOST" bash -s -- control < scripts/deploy/preflight_host.sh
+
+      - name: Deploy control node
+        env:
+          HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+          RELEASE_TAG: ${{ needs.plan.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          INFRA_REF: ${{ needs.plan.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ needs.plan.outputs.vn_news_config_ref }}
+          CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+          ORCHESTRATION_REF: ${{ needs.plan.outputs.vn_news_orchestration_ref }}
+          APP_REF: ${{ needs.plan.outputs.vn_news_app_ref }}
+          PLATFORM_LIB_REF: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
+        run: |
+          ssh "$USER@$HOST" bash -s -- \
+            control "$RELEASE_TAG" "$IMAGE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" "$ORCHESTRATION_REF" "$APP_REF" "$PLATFORM_LIB_REF" \
+            < scripts/deploy/production.sh
+
+  deploy-processing:
+    needs: [plan, verify-images, deploy-data]
+    if: ${{ always() && needs.plan.result == 'success' && needs['verify-images'].result == 'success' && (needs['deploy-data'].result == 'success' || needs['deploy-data'].result == 'skipped') && needs.plan.outputs.deploy_processing == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Check out CI/CD
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Preflight processing node
+        env:
+          HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+        run: ssh "$USER@$HOST" bash -s -- processing < scripts/deploy/preflight_host.sh
+
+      - name: Deploy processing node
+        env:
+          HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
+          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
+          RELEASE_TAG: ${{ needs.plan.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          INFRA_REF: ${{ needs.plan.outputs.vn_news_infra_ref }}
+          CONFIG_REF: ${{ needs.plan.outputs.vn_news_config_ref }}
+          CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
+        run: |
+          ssh "$USER@$HOST" bash -s -- \
+            processing "$RELEASE_TAG" "$IMAGE_TAG" "$INFRA_REF" "$CONFIG_REF" "$CICD_REF" \
+            < scripts/deploy/production.sh

@@ -94,9 +94,8 @@ jobs:
           - release_tag: $RELEASE_TAG
           - image_tag: $effective_image_tag
 
-          After this PR is merged:
-          1. Run Publish Images if image_tag is new.
-          2. Run Deploy Production with $RELEASE_TAG.toml.
+          After this PR is merged, run Release Production with $RELEASE_TAG.toml.
+          The workflow publishes required images, verifies the image tag, and deploys affected roles.
           EOF
           )
 

@@ -40,3 +40,43 @@ def test_publish_images_rejects_copy_without_source_tag() -> None:
             github_actions_cache=False,
             dry_run=True,
         )
+
+
+def test_publish_images_defaults_to_building_all_images(monkeypatch) -> None:
+    commands = []
+    catalog = {
+        "registry": "docker.io",
+        "namespace": "example",
+        "images": {
+            "api": {
+                "image_repository": "vn-news-api",
+                "build": {"context": ".", "dockerfile": "Dockerfile"},
+            },
+            "worker": {
+                "image_repository": "vn-news-worker",
+                "build": {"context": ".", "dockerfile": "Dockerfile"},
+            },
+        },
+    }
+
+    monkeypatch.setattr("scripts.publish_images.load_image_catalog", lambda: catalog)
+    monkeypatch.setattr(
+        "scripts.publish_images.image_command",
+        lambda catalog, image_key, tag, push, github_actions_cache: ["build", image_key],
+    )
+    monkeypatch.setattr(
+        "scripts.publish_images.run_command",
+        lambda command, dry_run: commands.append(command),
+    )
+
+    publish_images(
+        tag="0.2.32",
+        from_tag="",
+        build_images=[],
+        copy_images=[],
+        push=True,
+        github_actions_cache=False,
+        dry_run=True,
+    )
+
+    assert commands == [["build", "api"], ["build", "worker"]]

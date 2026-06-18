@@ -18,6 +18,10 @@ require_directory() {
   [[ -d "$1" ]] || fail "missing directory: $1"
 }
 
+require_env_value() {
+  grep -q "^$1=" "$env_file" || fail "$1 is not configured"
+}
+
 check_disk_usage() {
   local path="$1"
   local usage
@@ -35,7 +39,7 @@ esac
 for command_name in docker git sudo; do
   require_command "$command_name"
 done
-if [[ "$role" == "control" ]]; then
+if [[ "$role" == "data" || "$role" == "control" ]]; then
   require_command uv
   require_command python3
 fi
@@ -48,7 +52,13 @@ check_disk_usage /
 
 case "$role" in
   data)
-    grep -q '^VN_NEWS_RECOVERY_BUCKET=' "$env_file" || fail "VN_NEWS_RECOVERY_BUCKET is not configured"
+    require_env_value VN_NEWS_RECOVERY_BUCKET
+    require_env_value VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS
+    require_env_value VN_NEWS_SCHEMA_REGISTRY_URL
+    require_env_value VN_NEWS_STORAGE_ENDPOINT_URL
+    require_env_value VN_NEWS_SEAWEEDFS_S3_CONFIG_SECRET_OCID
+    require_env_value VN_NEWS_STORAGE_ADMIN_S3_CREDENTIALS_SECRET_OCID
+    require_env_value VN_NEWS_CLOUDFLARE_DATA_TUNNEL_TOKEN_SECRET_OCID
     require_command mountpoint
     mountpoint -q /srv/vn-news-data || fail "/srv/vn-news-data is not mounted"
     require_directory /srv/vn-news-data/redpanda
@@ -56,12 +66,20 @@ case "$role" in
     check_disk_usage /srv/vn-news-data
     ;;
   control)
-    grep -q '^VN_NEWS_RECOVERY_BUCKET=' "$env_file" || fail "VN_NEWS_RECOVERY_BUCKET is not configured"
+    require_env_value VN_NEWS_RECOVERY_BUCKET
+    require_env_value VN_NEWS_INGESTION_S3_CREDENTIALS_SECRET_OCID
+    require_env_value VN_NEWS_AIRFLOW_DB_PASSWORD_SECRET_OCID
+    require_env_value VN_NEWS_AIRFLOW_API_JWT_SECRET_OCID
+    require_env_value VN_NEWS_AIRFLOW_FERNET_KEY_SECRET_OCID
+    require_env_value VN_NEWS_AIRFLOW_ADMIN_PASSWORD_SECRET_OCID
+    require_env_value VN_NEWS_CLOUDFLARE_CONTROL_TUNNEL_TOKEN_SECRET_OCID
     require_directory /srv/vn-news-control/airflow-db
     require_directory /srv/vn-news-control/airflow-dag-bundles
     require_directory /srv/vn-news-control/airflow-logs
     ;;
   processing)
+    require_env_value VN_NEWS_INGESTION_S3_CREDENTIALS_SECRET_OCID
+    require_env_value VN_NEWS_CURATED_WRITER_S3_CREDENTIALS_SECRET_OCID
     require_directory /srv/vn-news-processing
     ;;
 esac

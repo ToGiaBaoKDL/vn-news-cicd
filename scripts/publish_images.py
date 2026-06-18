@@ -49,6 +49,8 @@ def publish_images(
         validate_tag(from_tag, push=True)
 
     image_keys = set(catalog["images"])
+    if not build_images and not copy_images:
+        build_images = sorted(image_keys)
     selected = set(build_images) | set(copy_images)
     unknown_images = sorted(selected - image_keys)
     if unknown_images:
