@@ -1,0 +1,12 @@
+version = 1
+release_tag = "0.2.43"
+image_tag = "0.2.43"
+
+[repositories]
+vn-news-cicd = "497ff5dec479e0c49fe1d72c767e9211805cc732"
+vn-news-app = "8e3ad676283b91275463ce6f92fab6a1d69bd752"
+vn-news-config = "4d51bd0e2429ecdc14cb307903d5fb0fb878f1b2"
+vn-news-infra = "da0859bdf58d2c0e64937368139eaeb3d3d71733"
+vn-news-orchestration = "4b6f5f174787343002746f71fe04d35d49108a66"
+vn-news-platform-lib = "afda39d2f3cb4677d920e3c94cff7b26613bac11"
+vn-news-services = "6aded2c892d364d8a1f25a71a2d8542e0577f354"
