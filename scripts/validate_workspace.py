@@ -541,6 +541,9 @@ def validate_runtime_secret_boundaries() -> None:
     cloudflare_secret_sync = (
         INFRA_ROOT / "scripts" / "sync_cloudflare_tunnel_secrets.py"
     ).read_text(encoding="utf-8")
+    secret_catalog = (INFRA_ROOT / "scripts" / "runtime_secret_catalog.py").read_text(
+        encoding="utf-8"
+    )
     tfvars_helper = INFRA_ROOT / "scripts" / "runtime_secret_tfvars.py"
 
     if "VN_NEWS_STORAGE_ADMIN_S3_CREDENTIALS_SECRET_OCID" not in env_by_role["data"]:
@@ -556,16 +559,23 @@ def validate_runtime_secret_boundaries() -> None:
     ):
         if token not in materializer:
             raise ValueError(f"runtime secret materializer missing {token}")
-    for token in ("curated_writer_s3_credentials", "vn-news-curated-writer"):
-        if token not in creator:
-            raise ValueError(f"runtime secret creator missing {token}")
+    for token in (
+        "curated_writer_s3_credentials",
+        "vn-news-curated-writer",
+        "storage_admin_s3_credentials",
+        "vn-news-storage-admin",
+    ):
+        if token not in secret_catalog:
+            raise ValueError(f"runtime secret catalog missing {token}")
     if not tfvars_helper.is_file():
         raise ValueError("runtime secret tfvars helper is missing")
     for script_name, script in {
         "create_runtime_secrets.py": creator,
         "sync_cloudflare_tunnel_secrets.py": cloudflare_secret_sync,
     }.items():
-        if "from runtime_secret_tfvars import merge_runtime_secret_ocids" not in script:
+        if "from runtime_secret_catalog import" not in script:
+            raise ValueError(f"{script_name} must use shared runtime secret catalog")
+        if "from runtime_secret_tfvars import" not in script:
             raise ValueError(f"{script_name} must use shared runtime secret tfvars helper")
         if "def render_runtime_secret_ocids" in script:
             raise ValueError(f"{script_name} must not duplicate runtime secret tfvars rendering")
