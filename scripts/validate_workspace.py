@@ -526,8 +526,14 @@ def validate_pipeline_metrics(config: dict) -> None:
     if not metrics:
         raise ValueError("event_bus.metrics must be configured")
     processing = load_compose("compose.processing.yaml")
-    if "pipeline-metrics" not in processing["services"]:
+    pipeline_metrics = processing["services"].get("pipeline-metrics")
+    if pipeline_metrics is None:
         raise ValueError("processing Compose must run pipeline-metrics")
+    if pipeline_metrics.get("secrets"):
+        raise ValueError("pipeline-metrics must not mount storage credentials")
+    healthcheck = pipeline_metrics.get("healthcheck", {}).get("test", [])
+    if "landing_storage" in healthcheck or "event_bus,schema_registry" not in healthcheck:
+        raise ValueError("pipeline-metrics healthcheck must exclude landing_storage")
 
     locals_text = (INFRA_ROOT / "terraform" / "oci" / "locals.tf").read_text(encoding="utf-8")
     if terraform_local_string(locals_text, "metric_namespace") != metrics["namespace"]:
