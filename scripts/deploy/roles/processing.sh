@@ -3,6 +3,9 @@
 deploy_processing_role() {
   checkout_config_repo
   set_config_paths
-  materialize_runtime_secrets
-  deploy_workers
+  reset_role_state
+  materialize_role_secrets
+  deploy_ingestion_workers
+  deploy_spark_worker
+  validate_spark_worker_registered
 }

@@ -58,13 +58,13 @@ jobs:
         id: release
         env:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
-        run: python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
+        run: python -m scripts.release.manifest --manifest "$RELEASE_MANIFEST" --github-output "$GITHUB_OUTPUT"
 
       - name: Validate release refs
         env:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
-        run: python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
+        run: python -m scripts.release.refs --manifest "$RELEASE_MANIFEST"
 
       - name: Plan release actions
         id: plan
@@ -72,7 +72,7 @@ jobs:
           RELEASE_MANIFEST: ${{ inputs.release_manifest }}
           BASE_RELEASE_MANIFEST: ${{ inputs.base_release_manifest }}
         run: |
-          uv run --no-project --with PyYAML python -m scripts.release_plan \
+          uv run --no-project --with PyYAML python -m scripts.release.plan \
             --manifest "$RELEASE_MANIFEST" \
             --base-manifest "$BASE_RELEASE_MANIFEST" \
             --github-output "$GITHUB_OUTPUT"
@@ -159,7 +159,7 @@ jobs:
           uv sync --frozen --all-groups
           uv lock --check
           uv run python -m pytest
-          uv run python -m scripts.validate_workspace
+          uv run python -m scripts.workspace.verify
 
       - name: Log in to Docker Hub
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
@@ -175,7 +175,7 @@ jobs:
           BUILD_IMAGES: ${{ needs.plan.outputs.build_images }}
           COPY_IMAGES: ${{ needs.plan.outputs.copy_images }}
         run: |
-          uv run python -m scripts.publish_images \
+          uv run python -m scripts.images.publish \
             --tag "$IMAGE_TAG" \
             --from-tag "$BASE_IMAGE_TAG" \
             --build-images "$BUILD_IMAGES" \
@@ -206,7 +206,7 @@ jobs:
       - name: Verify published images
         env:
           IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
-        run: uv run --no-project --with PyYAML python -m scripts.verify_images --tag "$IMAGE_TAG"
+        run: uv run --no-project --with PyYAML python -m scripts.images.verify --tag "$IMAGE_TAG"
 
   deploy-data:
     needs: [plan, verify-images]
@@ -221,14 +221,10 @@ jobs:
           ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
 
       - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
-        run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+        uses: ./.github/actions/configure-ssh
+        with:
+          private-key: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          known-hosts: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
 
       - name: Preflight data node
         env:
@@ -264,14 +260,10 @@ jobs:
           ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
 
       - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
-        run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+        uses: ./.github/actions/configure-ssh
+        with:
+          private-key: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          known-hosts: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
 
       - name: Preflight control node
         env:
@@ -297,10 +289,10 @@ jobs:
             < scripts/deploy/production.sh
 
   deploy-processing:
-    needs: [plan, verify-images, deploy-data]
-    if: ${{ always() && needs.plan.result == 'success' && needs['verify-images'].result == 'success' && (needs['deploy-data'].result == 'success' || needs['deploy-data'].result == 'skipped') && needs.plan.outputs.deploy_processing == 'true' }}
+    needs: [plan, verify-images, deploy-data, deploy-control]
+    if: ${{ always() && needs.plan.result == 'success' && needs['verify-images'].result == 'success' && (needs['deploy-data'].result == 'success' || needs['deploy-data'].result == 'skipped') && (needs['deploy-control'].result == 'success' || needs['deploy-control'].result == 'skipped') && needs.plan.outputs.deploy_processing == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     environment: production
     steps:
       - name: Check out CI/CD
@@ -309,14 +301,10 @@ jobs:
           ref: ${{ needs.plan.outputs.vn_news_cicd_ref }}
 
       - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
-        run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+        uses: ./.github/actions/configure-ssh
+        with:
+          private-key: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          known-hosts: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
 
       - name: Preflight processing node
         env:

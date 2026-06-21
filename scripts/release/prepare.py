@@ -6,15 +6,15 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from scripts.release_manifest import (
-    CICD_ROOT,
+from scripts.paths import CICD_ROOT
+from scripts.release.manifest import (
     COMMIT_REF_PATTERN,
     RELEASES_ROOT,
     REQUIRED_REPOSITORIES,
     load_release_manifest,
 )
-from scripts.release_tags import validate_tag
-from scripts.validate_release_refs import git_fetch_commit
+from scripts.release.refs import git_fetch_commit
+from scripts.release.tags import validate_tag
 
 
 def parse_args() -> argparse.Namespace:

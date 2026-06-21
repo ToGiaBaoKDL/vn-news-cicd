@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from scripts.publish_images import parse_csv, publish_images, retag_command
+from scripts.images.publish import parse_csv, publish_images, retag_command
 
 
 def test_parse_csv_ignores_empty_items() -> None:
@@ -59,13 +59,13 @@ def test_publish_images_defaults_to_building_all_images(monkeypatch) -> None:
         },
     }
 
-    monkeypatch.setattr("scripts.publish_images.load_image_catalog", lambda: catalog)
+    monkeypatch.setattr("scripts.images.publish.load_image_catalog", lambda: catalog)
     monkeypatch.setattr(
-        "scripts.publish_images.image_command",
+        "scripts.images.publish.image_command",
         lambda catalog, image_key, tag, push, github_actions_cache: ["build", image_key],
     )
     monkeypatch.setattr(
-        "scripts.publish_images.run_command",
+        "scripts.images.publish.run_command",
         lambda command, dry_run: commands.append(command),
     )
 

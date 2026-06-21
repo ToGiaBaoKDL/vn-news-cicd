@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts import prepare_release
-from scripts.release_manifest import REQUIRED_REPOSITORIES, load_release_manifest
+from scripts.release import prepare as prepare_release
+from scripts.release.manifest import REQUIRED_REPOSITORIES, load_release_manifest
 
 
 def test_parse_ref_overrides_accepts_cli_and_text_refs() -> None:

@@ -6,9 +6,9 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from scripts.release_tags import validate_tag
+from scripts.paths import CICD_ROOT
+from scripts.release.tags import validate_tag
 
-CICD_ROOT = Path(__file__).resolve().parents[1]
 RELEASES_ROOT = CICD_ROOT / "releases"
 COMMIT_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
 REQUIRED_REPOSITORIES = (

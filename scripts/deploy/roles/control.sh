@@ -10,9 +10,13 @@ deploy_control_role() {
   export VN_NEWS_ORCHESTRATION_GIT_REF="$orchestration_ref"
   set_role_env_value VN_NEWS_ORCHESTRATION_GIT_REF "$orchestration_ref"
 
-  materialize_runtime_secrets
+  reset_role_state
+  materialize_role_secrets
+  deploy_spark_master
+  validate_spark_master
   deploy_airflow
+  validate_airflow
   deploy_app
   deploy_control_access
-  configure_host_operations
+  configure_role_operations
 }

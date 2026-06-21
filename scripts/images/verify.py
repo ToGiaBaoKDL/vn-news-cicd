@@ -4,8 +4,8 @@ import argparse
 import json
 import subprocess
 
-from scripts.image_catalog import image_reference, load_image_catalog
-from scripts.release_tags import validate_tag
+from scripts.images.catalog import image_reference, load_image_catalog
+from scripts.release.tags import validate_tag
 
 
 def manifest_platforms(manifest: dict) -> set[str]:

@@ -59,15 +59,15 @@ jobs:
           if [[ -n "$IMAGE_TAG" ]]; then
             prepare_args+=(--image-tag "$IMAGE_TAG")
           fi
-          uv run --no-project --python 3.12 python -m scripts.prepare_release "${prepare_args[@]}"
+          uv run --no-project --python 3.12 python -m scripts.release.prepare "${prepare_args[@]}"
 
       - name: Validate release manifest
         env:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN }}
           RELEASE_MANIFEST: ${{ inputs.release_tag }}.toml
         run: |
-          uv run --no-project --python 3.12 python -m scripts.release_manifest --manifest "$RELEASE_MANIFEST"
-          uv run --no-project --python 3.12 python -m scripts.validate_release_refs --manifest "$RELEASE_MANIFEST"
+          uv run --no-project --python 3.12 python -m scripts.release.manifest --manifest "$RELEASE_MANIFEST"
+          uv run --no-project --python 3.12 python -m scripts.release.refs --manifest "$RELEASE_MANIFEST"
 
       - name: Open release PR
         env:

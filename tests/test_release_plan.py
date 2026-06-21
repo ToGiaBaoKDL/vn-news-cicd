@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.release_plan import (
+from scripts.release.plan import (
     create_release_plan,
     image_dependency_map,
     previous_manifest_path,
@@ -104,7 +104,7 @@ def test_release_plan_builds_only_service_images_for_service_change(tmp_path: Pa
     assert plan.copy_images == ["app_api", "app_web", "infra_airflow_runtime"]
     assert plan.publish_required is True
     assert plan.deploy_data is False
-    assert plan.deploy_control is False
+    assert plan.deploy_control is True
     assert plan.deploy_processing is True
 
 
@@ -174,7 +174,7 @@ def test_release_plan_ignores_cicd_manifest_only_change(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(
-        "scripts.release_plan.repository_has_functional_changes",
+        "scripts.release.plan.repository_has_functional_changes",
         lambda repo_name, base_ref, commit_ref: False,
     )
     base = write_manifest(

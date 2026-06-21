@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091
 set -euo pipefail
 
 deploy_root="${VN_NEWS_DEPLOY_ROOT:-$HOME/vn-news-intelligence}"
@@ -21,18 +22,32 @@ run_role() {
 
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   source "$script_dir/lib/context.sh"
-  source "$script_dir/lib/services.sh"
-  source "$script_dir/lib/bootstrap_actions.sh"
-  source "$script_dir/roles/data.sh"
-  source "$script_dir/roles/control.sh"
-  source "$script_dir/roles/processing.sh"
-
   prepare_deploy_context
 
   case "$role" in
-    data) deploy_data_role ;;
-    control) deploy_control_role ;;
-    processing) deploy_processing_role ;;
+    data)
+      source "$script_dir/lib/vault.sh"
+      source "$script_dir/services/cloudflare.sh"
+      source "$script_dir/services/polaris.sh"
+      source "$script_dir/services/redpanda.sh"
+      source "$script_dir/services/seaweedfs.sh"
+      source "$script_dir/roles/data.sh"
+      deploy_data_role
+      ;;
+    control)
+      source "$script_dir/services/airflow.sh"
+      source "$script_dir/services/app.sh"
+      source "$script_dir/services/cloudflare.sh"
+      source "$script_dir/services/spark.sh"
+      source "$script_dir/roles/control.sh"
+      deploy_control_role
+      ;;
+    processing)
+      source "$script_dir/services/ingestion.sh"
+      source "$script_dir/services/spark.sh"
+      source "$script_dir/roles/processing.sh"
+      deploy_processing_role
+      ;;
     *)
       echo "Unknown deployment role: $role" >&2
       exit 1

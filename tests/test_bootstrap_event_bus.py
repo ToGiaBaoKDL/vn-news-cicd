@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from scripts import bootstrap_topics, register_event_schemas
+from scripts.services.redpanda import bootstrap_topics, register_schemas
 
 
 def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypatch) -> None:
@@ -81,7 +81,7 @@ def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypa
     ]
 
 
-def test_register_event_schemas_sets_compatibility_first(monkeypatch) -> None:
+def test_register_schemas_sets_compatibility_first(monkeypatch) -> None:
     calls: list[tuple[str, str, dict[str, object]]] = []
     config = {
         "event_bus": {
@@ -104,38 +104,38 @@ def test_register_event_schemas_sets_compatibility_first(monkeypatch) -> None:
         def json(self) -> dict[str, object]:
             return self.payload
 
-    monkeypatch.setattr(register_event_schemas, "load_settings", lambda: config)
+    monkeypatch.setattr(register_schemas, "load_settings", lambda: config)
     monkeypatch.setattr(
-        register_event_schemas,
+        register_schemas,
         "EVENT_TOPIC_KEYS",
         {"feed_item_discovered": "feed_item_discovered"},
     )
     monkeypatch.setattr(
-        register_event_schemas,
+        register_schemas,
         "event_json_schema",
         lambda event_name: {"title": event_name},
     )
     monkeypatch.setattr(
-        register_event_schemas,
+        register_schemas,
         "parse_args",
-        lambda: register_event_schemas.argparse.Namespace(
+        lambda: register_schemas.argparse.Namespace(
             registry_url=None,
             compatibility="BACKWARD",
             dry_run=False,
         ),
     )
     monkeypatch.setattr(
-        register_event_schemas.httpx,
+        register_schemas.httpx,
         "put",
         lambda url, json, timeout: calls.append(("PUT", url, json)) or Response(),
     )
     monkeypatch.setattr(
-        register_event_schemas.httpx,
+        register_schemas.httpx,
         "post",
         lambda url, json, timeout: calls.append(("POST", url, json)) or Response({"version": 1}),
     )
 
-    register_event_schemas.main()
+    register_schemas.main()
 
     assert calls[0] == (
         "PUT",
@@ -148,12 +148,12 @@ def test_register_event_schemas_sets_compatibility_first(monkeypatch) -> None:
     )
 
 
-def test_register_event_schemas_surfaces_registry_errors(monkeypatch) -> None:
-    monkeypatch.setattr(register_event_schemas, "load_settings", lambda: {"event_bus": {}})
+def test_register_schemas_surfaces_registry_errors(monkeypatch) -> None:
+    monkeypatch.setattr(register_schemas, "load_settings", lambda: {"event_bus": {}})
     monkeypatch.setattr(
-        register_event_schemas,
+        register_schemas,
         "parse_args",
-        lambda: register_event_schemas.argparse.Namespace(
+        lambda: register_schemas.argparse.Namespace(
             registry_url="http://redpanda:8081",
             compatibility="BACKWARD",
             dry_run=False,
@@ -164,7 +164,7 @@ def test_register_event_schemas_surfaces_registry_errors(monkeypatch) -> None:
         response = httpx.Response(500, request=httpx.Request("PUT", url))
         return response
 
-    monkeypatch.setattr(register_event_schemas.httpx, "put", fail_put)
+    monkeypatch.setattr(register_schemas.httpx, "put", fail_put)
 
     with pytest.raises(httpx.HTTPStatusError):
-        register_event_schemas.main()
+        register_schemas.main()

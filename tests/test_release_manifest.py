@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.release_manifest import (
+from scripts.release.manifest import (
     REQUIRED_REPOSITORIES,
     ReleaseManifest,
     load_release_manifest,

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from scripts.image_catalog import image_reference
-from scripts.verify_images import manifest_platforms, verify_image
+from scripts.images.catalog import image_reference
+from scripts.images.verify import manifest_platforms, verify_image
 
 
 def test_image_reference_uses_catalog_identity() -> None:
@@ -29,7 +29,7 @@ def test_manifest_platforms_reads_image_index() -> None:
 
 def test_verify_image_rejects_missing_platform(monkeypatch) -> None:
     monkeypatch.setattr(
-        "scripts.verify_images.inspect_image",
+        "scripts.images.verify.inspect_image",
         lambda _: {"manifests": [{"platform": {"os": "linux", "architecture": "amd64"}}]},
     )
 

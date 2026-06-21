@@ -4,8 +4,7 @@ from pathlib import Path
 
 import yaml
 
-CICD_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = CICD_ROOT.parent
+from scripts.paths import CICD_ROOT
 
 
 def load_image_catalog(path: Path | None = None) -> dict:

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2030,SC2031
 
 role="${VN_NEWS_DEPLOY_ROLE:?VN_NEWS_DEPLOY_ROLE is required}"
 release_tag="${VN_NEWS_DEPLOY_RELEASE_TAG:?VN_NEWS_DEPLOY_RELEASE_TAG is required}"
@@ -57,13 +58,13 @@ load_role_env() {
   fi
 
   set -a
+  # shellcheck disable=SC1090
   source "$env_file"
   set +a
 
   export VN_NEWS_RELEASE_TAG="$release_tag"
   export VN_NEWS_IMAGE_TAG="$image_tag"
   export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
-  load_image_env
 }
 
 load_image_env() {
@@ -77,8 +78,8 @@ load_image_env() {
 
   registry="$(awk -F': *' '$1 == "registry" {print $2; exit}' "$images_manifest")"
   namespace="$(awk -F': *' '$1 == "namespace" {print $2; exit}' "$images_manifest")"
-  export VN_NEWS_IMAGE_REGISTRY="${VN_NEWS_IMAGE_REGISTRY:-$registry}"
-  export VN_NEWS_IMAGE_NAMESPACE="${VN_NEWS_IMAGE_NAMESPACE:-$namespace}"
+  export VN_NEWS_IMAGE_REGISTRY="$registry"
+  export VN_NEWS_IMAGE_NAMESPACE="$namespace"
 
   if [[ -z "$VN_NEWS_IMAGE_REGISTRY" || -z "$VN_NEWS_IMAGE_NAMESPACE" ]]; then
     echo "Image registry and namespace are required in $images_manifest" >&2
@@ -101,18 +102,27 @@ prepare_deploy_context() {
   set_role_env_value VN_NEWS_RELEASE_TAG "$release_tag"
   set_role_env_value VN_NEWS_IMAGE_TAG "$image_tag"
   if [[ "$role" != "data" ]]; then
+    load_image_env
     set_role_env_value VN_NEWS_IMAGE_REGISTRY "$VN_NEWS_IMAGE_REGISTRY"
     set_role_env_value VN_NEWS_IMAGE_NAMESPACE "$VN_NEWS_IMAGE_NAMESPACE"
   fi
   echo "deployment context: role=$role release=$release_tag image=$image_tag"
 }
 
-materialize_runtime_secrets() {
-  sudo bash -lc "set -euo pipefail; set -a; source '$env_file'; set +a; '$infra_root/scripts/materialize_runtime_secrets.sh' '$role'"
+materialize_role_secrets() {
+  sudo bash -lc "set -euo pipefail; set -a; source '$env_file'; set +a; '$infra_root/scripts/secrets/materialize.sh' '$role'"
 }
 
-configure_host_operations() {
-  sudo "$infra_root/scripts/configure_host_operations.sh" "$role" "$deploy_root"
+configure_role_operations() {
+  sudo "$infra_root/scripts/host/configure_operations.sh" "$role" "$deploy_root"
+}
+
+reset_role_state() {
+  if [[ "${VN_NEWS_DEPLOY_RESET:-0}" != "1" ]]; then
+    return
+  fi
+
+  sudo "$infra_root/scripts/host/reset_role.sh" "$role" --wipe-data --force
 }
 
 compose_data() {
@@ -136,8 +146,16 @@ set_config_paths() {
 
 prepare_cicd_python() {
   (
-    cd "$cicd_root"
+    cd "$cicd_root" || exit
     export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
-    uv sync --frozen --all-groups
+    uv sync --frozen --no-dev
+  )
+}
+
+run_cicd_module() {
+  (
+    cd "$cicd_root" || exit
+    export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
+    uv run --no-dev python -m "$@"
   )
 }

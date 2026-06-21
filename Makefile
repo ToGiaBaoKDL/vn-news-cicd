@@ -17,7 +17,7 @@ lock:
 	$(UV) --cache-dir $(UV_CACHE_DIR) lock
 
 validate:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.validate_workspace
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.workspace.verify
 
 lint:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run ruff check .
@@ -32,21 +32,21 @@ test:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m pytest
 
 prepare-release:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.prepare_release $(PREPARE_RELEASE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.release.prepare $(PREPARE_RELEASE_ARGS)
 
 build-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.build_images --tag $(TAG) $(BUILD_IMAGE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.images.build --tag $(TAG) $(BUILD_IMAGE_ARGS)
 
 publish-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.publish_images --tag $(TAG) --push $(BUILD_IMAGE_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.images.publish --tag $(TAG) --push $(BUILD_IMAGE_ARGS)
 
 bootstrap-ingestion: bootstrap-topics register-event-schemas bootstrap-storage
 
 bootstrap-storage:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.bootstrap_storage $(STORAGE_BOOTSTRAP_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.services.seaweedfs.bootstrap_buckets $(STORAGE_BOOTSTRAP_ARGS)
 
 bootstrap-topics:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.bootstrap_topics --rpk-command "$(RPK_COMMAND)" --brokers redpanda:9092 $(TOPIC_BOOTSTRAP_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.services.redpanda.bootstrap_topics --rpk-command "$(RPK_COMMAND)" --brokers redpanda:9092 $(TOPIC_BOOTSTRAP_ARGS)
 
 register-event-schemas:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.register_event_schemas $(SCHEMA_REGISTRY_ARGS)
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.services.redpanda.register_schemas $(SCHEMA_REGISTRY_ARGS)

@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from scripts.release_manifest import load_release_manifest, resolve_release_manifest
+from scripts.release.manifest import load_release_manifest, resolve_release_manifest
 
 
 def parse_args() -> argparse.Namespace:

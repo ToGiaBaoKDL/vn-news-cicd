@@ -7,7 +7,7 @@ import pytest
 import yaml
 from news_platform.config import load_settings
 from news_platform.ids import make_run_id, normalize_article_url
-from scripts.validate_workspace import (
+from scripts.workspace.verify import (
     validate_release_identity_usage,
     validate_workflow_action_ref,
 )
@@ -58,7 +58,7 @@ def test_workflow_action_ref_rejects_tag() -> None:
         )
 
 
-def test_processing_deploy_waits_for_data_not_control() -> None:
+def test_processing_deploy_waits_for_data_and_spark_master() -> None:
     workflow = yaml.safe_load(
         Path(".github/workflows/release-production.yaml").read_text(encoding="utf-8")
     )
@@ -67,7 +67,11 @@ def test_processing_deploy_waits_for_data_not_control() -> None:
         "plan",
         "verify-images",
         "deploy-data",
+        "deploy-control",
     }
+    condition = workflow["jobs"]["deploy-processing"]["if"]
+    assert "needs['deploy-control'].result == 'success'" in condition
+    assert "needs['deploy-control'].result == 'skipped'" in condition
 
 
 def test_deploy_uses_distinct_release_and_image_tags() -> None:
@@ -93,5 +97,5 @@ def test_release_workflow_enables_github_actions_build_cache() -> None:
     assert "publish_required" in workflow
     assert "--github-actions-cache" in workflow
     assert "crazy-max/ghaction-github-runtime@" in workflow
-    assert "python -m scripts.publish_images" in workflow
-    assert "python -m scripts.build_images --tag" not in workflow
+    assert "python -m scripts.images.publish" in workflow
+    assert "python -m scripts.images.build --tag" not in workflow

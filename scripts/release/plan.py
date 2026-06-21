@@ -5,13 +5,44 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from scripts.image_catalog import load_image_catalog
-from scripts.release_manifest import (
-    CICD_ROOT,
+from scripts.images.catalog import load_image_catalog
+from scripts.paths import CICD_ROOT
+from scripts.release.manifest import (
     ReleaseManifest,
     load_release_manifest,
     resolve_release_manifest,
 )
+
+ROLE_REPOSITORY_DEPENDENCIES = {
+    "data": frozenset(
+        {
+            "vn-news-cicd",
+            "vn-news-config",
+            "vn-news-infra",
+            "vn-news-platform-lib",
+        }
+    ),
+    "control": frozenset(
+        {
+            "vn-news-app",
+            "vn-news-cicd",
+            "vn-news-config",
+            "vn-news-infra",
+            "vn-news-orchestration",
+            "vn-news-platform-lib",
+            "vn-news-services",
+        }
+    ),
+    "processing": frozenset(
+        {
+            "vn-news-cicd",
+            "vn-news-config",
+            "vn-news-infra",
+            "vn-news-platform-lib",
+            "vn-news-services",
+        }
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -146,37 +177,10 @@ def planned_roles(changed_repos: set[str], *, has_base: bool) -> tuple[bool, boo
     if not has_base:
         return True, True, True
 
-    deploy_data = bool(
-        {
-            "vn-news-cicd",
-            "vn-news-config",
-            "vn-news-infra",
-            "vn-news-platform-lib",
-        }
-        & changed_repos
+    return tuple(
+        bool(changed_repos & ROLE_REPOSITORY_DEPENDENCIES[role])
+        for role in ("data", "control", "processing")
     )
-    deploy_control = bool(
-        {
-            "vn-news-app",
-            "vn-news-cicd",
-            "vn-news-config",
-            "vn-news-infra",
-            "vn-news-orchestration",
-            "vn-news-platform-lib",
-        }
-        & changed_repos
-    )
-    deploy_processing = bool(
-        {
-            "vn-news-cicd",
-            "vn-news-config",
-            "vn-news-infra",
-            "vn-news-platform-lib",
-            "vn-news-services",
-        }
-        & changed_repos
-    )
-    return deploy_data, deploy_control, deploy_processing
 
 
 def resolve_base_manifest(

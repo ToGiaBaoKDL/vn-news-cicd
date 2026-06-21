@@ -1,0 +1,26 @@
+name: Configure SSH
+description: Install the production deployment SSH key and pinned host keys.
+
+inputs:
+  private-key:
+    description: SSH private key used for production deployment.
+    required: true
+  known-hosts:
+    description: Trusted SSH known_hosts entries for production nodes.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.private-key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        set -euo pipefail
+        : "${SSH_PRIVATE_KEY:?private-key input is empty}"
+        : "${SSH_KNOWN_HOSTS:?known-hosts input is empty}"
+        install -d -m 700 ~/.ssh
+        printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts

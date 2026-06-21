@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from scripts.validate_release_refs import git_fetch_commit
+from scripts.release.refs import git_fetch_commit
 
 
 def test_git_fetch_commit_verifies_exact_commit(

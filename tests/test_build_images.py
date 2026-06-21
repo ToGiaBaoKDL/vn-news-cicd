@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from scripts.build_images import image_command, validate_tag
+from scripts.images.build import image_command, validate_tag
 
 
 @pytest.mark.parametrize("tag", ["0.1.0", "2026-06-02.1", "sha-a1b2c3d"])
