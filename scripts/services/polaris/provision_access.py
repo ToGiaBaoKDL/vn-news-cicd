@@ -26,9 +26,15 @@ from scripts.services.polaris.client import (
     write_credentials_file,
 )
 
-DEFAULT_RUNTIME_CATALOG_ROLE_NAME = "vn-news-curated-writer"
+DEFAULT_RUNTIME_CATALOG_ROLE_NAME = "vn-news-spark-runtime-writer"
 DEFAULT_RUNTIME_PRINCIPAL_NAME = "vn-news-spark-runtime"
 DEFAULT_RUNTIME_PRINCIPAL_ROLE_NAME = "vn-news-spark-runtime"
+LEGACY_RUNTIME_CATALOG_ROLE_NAMES = ("vn-news-curated-writer",)
+
+RUNTIME_ENTITY_PROPERTIES = {
+    "managed-by": "vn-news-cicd",
+    "purpose": "spark-runtime-writer",
+}
 
 RUNTIME_NAMESPACE_PRIVILEGES = (
     "NAMESPACE_READ_PROPERTIES",
@@ -51,6 +57,10 @@ class PolarisAccessConfig:
     catalog_role_name: str
     credentials_output_file: Path | None
     rotate_credentials: bool
+
+    def __post_init__(self) -> None:
+        if self.catalog_role_name in LEGACY_RUNTIME_CATALOG_ROLE_NAMES:
+            raise ValueError(f"retired Polaris runtime catalog role: {self.catalog_role_name}")
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -201,6 +211,26 @@ class PolarisAccessProvisioner(PolarisClient):
         super().__init__(client, catalog_config, credentials)
         self.access_config = access_config
 
+    def catalog_roles_url(self) -> str:
+        return join_url(
+            self.config.management_url,
+            "catalogs",
+            encode_path_part(self.config.catalog_name),
+            "catalog-roles",
+        )
+
+    def catalog_role_url(self, role_name: str) -> str:
+        return join_url(self.catalog_roles_url(), encode_path_part(role_name))
+
+    def principal_catalog_roles_url(self) -> str:
+        return join_url(
+            self.config.management_url,
+            "principal-roles",
+            encode_path_part(self.access_config.principal_role_name),
+            "catalog-roles",
+            encode_path_part(self.config.catalog_name),
+        )
+
     def ensure_runtime_principal(self) -> PolarisCredentials | None:
         principal_name = self.access_config.principal_name
         principal_url = join_url(
@@ -232,10 +262,7 @@ class PolarisAccessProvisioner(PolarisClient):
             json={
                 "principal": {
                     "name": principal_name,
-                    "properties": {
-                        "managed-by": "vn-news-cicd",
-                        "purpose": "spark-curated-writer",
-                    },
+                    "properties": RUNTIME_ENTITY_PROPERTIES,
                 },
                 "credentialRotationRequired": False,
             },
@@ -267,10 +294,7 @@ class PolarisAccessProvisioner(PolarisClient):
             json={
                 "principalRole": {
                     "name": role_name,
-                    "properties": {
-                        "managed-by": "vn-news-cicd",
-                        "purpose": "spark-curated-writer",
-                    },
+                    "properties": RUNTIME_ENTITY_PROPERTIES,
                 }
             },
         )
@@ -306,13 +330,7 @@ class PolarisAccessProvisioner(PolarisClient):
 
     def ensure_catalog_role(self) -> None:
         role_name = self.access_config.catalog_role_name
-        role_url = join_url(
-            self.config.management_url,
-            "catalogs",
-            encode_path_part(self.config.catalog_name),
-            "catalog-roles",
-            encode_path_part(role_name),
-        )
+        role_url = self.catalog_role_url(role_name)
         response = self.client.get(role_url, headers=self.auth_headers())
         if response.status_code == 200:
             print(f"exists Polaris catalog role: {self.config.catalog_name}/{role_name}")
@@ -321,20 +339,12 @@ class PolarisAccessProvisioner(PolarisClient):
             response.raise_for_status()
 
         create_response = self.client.post(
-            join_url(
-                self.config.management_url,
-                "catalogs",
-                encode_path_part(self.config.catalog_name),
-                "catalog-roles",
-            ),
+            self.catalog_roles_url(),
             headers=self.auth_headers(),
             json={
                 "catalogRole": {
                     "name": role_name,
-                    "properties": {
-                        "managed-by": "vn-news-cicd",
-                        "purpose": "spark-curated-writer",
-                    },
+                    "properties": RUNTIME_ENTITY_PROPERTIES,
                 }
             },
         )
@@ -347,13 +357,7 @@ class PolarisAccessProvisioner(PolarisClient):
     def assign_catalog_role(self) -> None:
         principal_role_name = self.access_config.principal_role_name
         catalog_role_name = self.access_config.catalog_role_name
-        roles_url = join_url(
-            self.config.management_url,
-            "principal-roles",
-            encode_path_part(principal_role_name),
-            "catalog-roles",
-            encode_path_part(self.config.catalog_name),
-        )
+        roles_url = self.principal_catalog_roles_url()
         response = self.client.get(roles_url, headers=self.auth_headers())
         response.raise_for_status()
         roles = response.json().get("roles", [])
@@ -377,11 +381,7 @@ class PolarisAccessProvisioner(PolarisClient):
 
     def ensure_grants(self, contracts: tuple[IcebergTableContract, ...]) -> None:
         grants_url = join_url(
-            self.config.management_url,
-            "catalogs",
-            encode_path_part(self.config.catalog_name),
-            "catalog-roles",
-            encode_path_part(self.access_config.catalog_role_name),
+            self.catalog_role_url(self.access_config.catalog_role_name),
             "grants",
         )
         response = self.client.get(grants_url, headers=self.auth_headers())
@@ -403,6 +403,35 @@ class PolarisAccessProvisioner(PolarisClient):
             add_response.raise_for_status()
             print(f"granted Polaris runtime privilege: {grant}")
 
+    def remove_legacy_catalog_roles(self) -> None:
+        for role_name in LEGACY_RUNTIME_CATALOG_ROLE_NAMES:
+            role_url = self.catalog_role_url(role_name)
+            response = self.client.get(role_url, headers=self.auth_headers())
+            if response.status_code == 404:
+                continue
+            response.raise_for_status()
+            payload = response.json()
+            role = payload.get("catalogRole", payload)
+            properties = role.get("properties", {}) if isinstance(role, dict) else {}
+            if properties.get("managed-by") != RUNTIME_ENTITY_PROPERTIES["managed-by"]:
+                raise RuntimeError(
+                    "Refusing to delete unmanaged legacy Polaris catalog role: "
+                    f"{self.config.catalog_name}/{role_name}"
+                )
+
+            assignment_url = join_url(
+                self.principal_catalog_roles_url(),
+                encode_path_part(role_name),
+            )
+            revoke_response = self.client.delete(assignment_url, headers=self.auth_headers())
+            if revoke_response.status_code not in {204, 404}:
+                revoke_response.raise_for_status()
+
+            delete_response = self.client.delete(role_url, headers=self.auth_headers())
+            if delete_response.status_code not in {204, 404}:
+                delete_response.raise_for_status()
+            print(f"removed legacy Polaris catalog role: {self.config.catalog_name}/{role_name}")
+
     def provision_access(
         self,
         contracts: tuple[IcebergTableContract, ...],
@@ -414,6 +443,7 @@ class PolarisAccessProvisioner(PolarisClient):
         self.ensure_catalog_role()
         self.assign_catalog_role()
         self.ensure_grants(contracts)
+        self.remove_legacy_catalog_roles()
         return new_credentials
 
 
@@ -429,6 +459,10 @@ def print_dry_run(
     )
     for grant in runtime_grants(CURATED_TABLE_CONTRACTS):
         print(f"would ensure Polaris runtime grant: {grant}")
+    for role_name in LEGACY_RUNTIME_CATALOG_ROLE_NAMES:
+        print(
+            f"would remove legacy Polaris catalog role: {catalog_config.catalog_name}/{role_name}"
+        )
 
 
 def main() -> None:

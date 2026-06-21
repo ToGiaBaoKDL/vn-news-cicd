@@ -50,7 +50,7 @@ def access_config(tmp_path: Path | None = None) -> provision_access.PolarisAcces
     return provision_access.PolarisAccessConfig(
         principal_name="vn-news-spark-runtime",
         principal_role_name="vn-news-spark-runtime",
-        catalog_role_name="vn-news-curated-writer",
+        catalog_role_name="vn-news-spark-runtime-writer",
         credentials_output_file=(tmp_path / "polaris-client-credentials.json")
         if tmp_path
         else None,
@@ -178,7 +178,7 @@ def test_pending_runtime_credentials_force_rotation(tmp_path: Path) -> None:
     args = argparse.Namespace(
         runtime_principal_name="vn-news-spark-runtime",
         runtime_principal_role_name="vn-news-spark-runtime",
-        runtime_catalog_role_name="vn-news-curated-writer",
+        runtime_catalog_role_name="vn-news-spark-runtime-writer",
         runtime_credentials_output_file=tmp_path / "polaris-client-credentials.new.json",
         current_runtime_credentials_file=current_credentials_file,
         rotate_runtime_credentials=False,
@@ -187,6 +187,17 @@ def test_pending_runtime_credentials_force_rotation(tmp_path: Path) -> None:
     config = provision_access.build_access_config(args)
 
     assert config.rotate_credentials is True
+
+
+def test_legacy_runtime_catalog_role_is_rejected() -> None:
+    with pytest.raises(ValueError, match="retired Polaris runtime catalog role"):
+        provision_access.PolarisAccessConfig(
+            principal_name="vn-news-spark-runtime",
+            principal_role_name="vn-news-spark-runtime",
+            catalog_role_name="vn-news-curated-writer",
+            credentials_output_file=None,
+            rotate_credentials=False,
+        )
 
 
 def test_bootstrapper_creates_catalog_namespace_and_tables() -> None:
@@ -225,9 +236,11 @@ def test_bootstrapper_creates_catalog_namespace_and_tables() -> None:
 
 
 def test_provisioner_creates_runtime_principal_roles_and_grants(tmp_path: Path) -> None:
+    requests: list[httpx.Request] = []
     payloads: list[dict[str, object]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
         if request.headers.get("content-type") == "application/json" and request.content:
             payloads.append(json.loads(request.content.decode()))
         if request.url.path == "/api/catalog/v1/oauth/tokens":
@@ -242,8 +255,18 @@ def test_provisioner_creates_runtime_principal_roles_and_grants(tmp_path: Path) 
             return httpx.Response(200, json={"roles": []}, request=request)
         if request.method == "GET" and request.url.path.endswith("/grants"):
             return httpx.Response(200, json={"grants": []}, request=request)
+        if request.method == "GET" and request.url.path.endswith(
+            "/catalog-roles/vn-news-curated-writer"
+        ):
+            return httpx.Response(
+                200,
+                json={"catalogRole": {"properties": {"managed-by": "vn-news-cicd"}}},
+                request=request,
+            )
         if request.method == "GET":
             return httpx.Response(404, request=request)
+        if request.method == "DELETE":
+            return httpx.Response(204, request=request)
         if request.method == "POST" and request.url.path == "/api/management/v1/principals":
             return httpx.Response(
                 201,
@@ -280,7 +303,7 @@ def test_provisioner_creates_runtime_principal_roles_and_grants(tmp_path: Path) 
         for payload in payloads
     )
     assert any(
-        payload.get("catalogRole", {}).get("name") == "vn-news-curated-writer"
+        payload.get("catalogRole", {}).get("name") == "vn-news-spark-runtime-writer"
         for payload in payloads
     )
     assert {
@@ -291,6 +314,24 @@ def test_provisioner_creates_runtime_principal_roles_and_grants(tmp_path: Path) 
             "privilege": "TABLE_WRITE_DATA",
         }
     } in payloads
+
+    legacy_assignment_path = (
+        "/api/management/v1/principal-roles/vn-news-spark-runtime/"
+        "catalog-roles/vn_news/vn-news-curated-writer"
+    )
+    legacy_role_path = "/api/management/v1/catalogs/vn_news/catalog-roles/vn-news-curated-writer"
+    deleted_paths = [request.url.path for request in requests if request.method == "DELETE"]
+    assert deleted_paths == [legacy_assignment_path, legacy_role_path]
+
+    last_grant_index = max(
+        index
+        for index, request in enumerate(requests)
+        if request.method == "PUT" and request.url.path.endswith("/grants")
+    )
+    first_delete_index = next(
+        index for index, request in enumerate(requests) if request.method == "DELETE"
+    )
+    assert first_delete_index > last_grant_index
 
 
 def test_validator_requires_vended_credentials() -> None:
