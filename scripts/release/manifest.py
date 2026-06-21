@@ -11,7 +11,7 @@ from scripts.release.tags import validate_tag
 
 RELEASES_ROOT = CICD_ROOT / "releases"
 COMMIT_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
-REQUIRED_REPOSITORIES = (
+VERSION_1_REPOSITORIES = (
     "vn-news-cicd",
     "vn-news-app",
     "vn-news-config",
@@ -20,6 +20,11 @@ REQUIRED_REPOSITORIES = (
     "vn-news-platform-lib",
     "vn-news-services",
 )
+REQUIRED_REPOSITORIES = (*VERSION_1_REPOSITORIES, "vn-news-pipelines")
+REPOSITORIES_BY_VERSION = {
+    1: VERSION_1_REPOSITORIES,
+    2: REQUIRED_REPOSITORIES,
+}
 
 
 @dataclass(frozen=True)
@@ -33,8 +38,9 @@ def load_release_manifest(path: Path) -> ReleaseManifest:
     with path.open("rb") as manifest_file:
         manifest = tomllib.load(manifest_file)
 
-    if manifest.get("version") != 1:
-        raise ValueError(f"{path} version must be 1")
+    version = manifest.get("version")
+    if version not in REPOSITORIES_BY_VERSION:
+        raise ValueError(f"{path} version must be one of {sorted(REPOSITORIES_BY_VERSION)}")
 
     release_tag = manifest.get("release_tag")
     if not isinstance(release_tag, str):
@@ -49,7 +55,7 @@ def load_release_manifest(path: Path) -> ReleaseManifest:
     if not isinstance(repositories, dict):
         raise ValueError(f"{path} must define repositories")
 
-    expected = set(REQUIRED_REPOSITORIES)
+    expected = set(REPOSITORIES_BY_VERSION[version])
     actual = set(repositories)
     if actual != expected:
         raise ValueError(f"{path} repositories must be {sorted(expected)}, got {sorted(actual)}")

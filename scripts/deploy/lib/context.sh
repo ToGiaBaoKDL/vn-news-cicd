@@ -7,6 +7,7 @@ image_tag="${VN_NEWS_DEPLOY_IMAGE_TAG:?VN_NEWS_DEPLOY_IMAGE_TAG is required}"
 infra_ref="${VN_NEWS_DEPLOY_INFRA_REF:?VN_NEWS_DEPLOY_INFRA_REF is required}"
 config_ref="${VN_NEWS_DEPLOY_CONFIG_REF:-}"
 platform_lib_ref="${VN_NEWS_DEPLOY_PLATFORM_LIB_REF:-}"
+pipelines_ref="${VN_NEWS_DEPLOY_PIPELINES_REF:-}"
 deploy_root="${VN_NEWS_DEPLOY_ROOT:-$HOME/vn-news-intelligence}"
 repos_root="$deploy_root/repos"
 repo_owner="${VN_NEWS_GITHUB_OWNER:-ToGiaBaoKDL}"
@@ -40,6 +41,14 @@ checkout_platform_lib_repo() {
     exit 1
   fi
   checkout_repo vn-news-platform-lib "$platform_lib_ref"
+}
+
+checkout_pipelines_repo() {
+  if [[ -z "$pipelines_ref" ]]; then
+    echo "pipelines ref is required for role: $role" >&2
+    exit 1
+  fi
+  checkout_repo vn-news-pipelines "$pipelines_ref"
 }
 
 require_command() {

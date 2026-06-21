@@ -5,18 +5,19 @@ from pathlib import Path
 import pytest
 from scripts.release.manifest import (
     REQUIRED_REPOSITORIES,
+    VERSION_1_REPOSITORIES,
     ReleaseManifest,
     load_release_manifest,
     write_github_output,
 )
 
 
-def write_manifest(path: Path, repositories: dict[str, str]) -> None:
+def write_manifest(path: Path, repositories: dict[str, str], *, version: int = 2) -> None:
     repository_lines = "\n".join(
         f'{repository} = "{commit_ref}"' for repository, commit_ref in repositories.items()
     )
     path.write_text(
-        f'version = 1\nrelease_tag = "0.1.0"\n\n[repositories]\n{repository_lines}\n',
+        f'version = {version}\nrelease_tag = "0.1.0"\n\n[repositories]\n{repository_lines}\n',
         encoding="utf-8",
     )
 
@@ -52,6 +53,14 @@ def test_release_manifest_accepts_separate_image_tag(tmp_path: Path) -> None:
 
     assert manifest.release_tag == "0.1.1"
     assert manifest.image_tag == "0.1.0"
+
+
+def test_release_manifest_keeps_version_one_history_valid(tmp_path: Path) -> None:
+    path = tmp_path / "release.toml"
+    repositories = {repository: "a" * 40 for repository in VERSION_1_REPOSITORIES}
+    write_manifest(path, repositories, version=1)
+
+    assert load_release_manifest(path).repositories == repositories
 
 
 def test_release_manifest_requires_every_repository(tmp_path: Path) -> None:

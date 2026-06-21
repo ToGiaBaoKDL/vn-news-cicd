@@ -29,6 +29,7 @@ ROLE_REPOSITORY_DEPENDENCIES = {
             "vn-news-config",
             "vn-news-infra",
             "vn-news-orchestration",
+            "vn-news-pipelines",
             "vn-news-platform-lib",
             "vn-news-services",
         }

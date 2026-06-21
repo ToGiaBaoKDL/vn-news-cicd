@@ -54,6 +54,13 @@ jobs:
           token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           path: vn-news-platform-lib
 
+      - name: Check out pipelines
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ github.repository_owner }}/vn-news-pipelines
+          token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          path: vn-news-pipelines
+
       - name: Check out services
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:

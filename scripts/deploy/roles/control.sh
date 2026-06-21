@@ -6,6 +6,7 @@ deploy_control_role() {
 
   checkout_config_repo
   checkout_repo vn-news-app "$app_ref"
+  checkout_pipelines_repo
   set_config_paths
   export VN_NEWS_ORCHESTRATION_GIT_REF="$orchestration_ref"
   set_role_env_value VN_NEWS_ORCHESTRATION_GIT_REF "$orchestration_ref"

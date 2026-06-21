@@ -116,7 +116,7 @@ def render_manifest(
     repositories: dict[str, str],
 ) -> str:
     lines = [
-        "version = 1",
+        "version = 2",
         f'release_tag = "{release_tag}"',
         f'image_tag = "{image_tag}"',
         "",

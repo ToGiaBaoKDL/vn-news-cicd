@@ -17,6 +17,7 @@ REPOSITORIES = {
     "vn-news-orchestration": "4" * 40,
     "vn-news-platform-lib": "5" * 40,
     "vn-news-services": "6" * 40,
+    "vn-news-pipelines": "7" * 40,
 }
 
 
@@ -56,7 +57,7 @@ def write_manifest(
 ) -> Path:
     repositories = {**REPOSITORIES, **(overrides or {})}
     lines = [
-        "version = 1",
+        "version = 2",
         f'release_tag = "{release_tag}"',
         f'image_tag = "{image_tag}"',
         "",
@@ -167,6 +168,34 @@ def test_release_plan_does_not_rebuild_images_for_cicd_only_release(
     assert plan.deploy_data is True
     assert plan.deploy_control is True
     assert plan.deploy_processing is True
+
+
+def test_release_plan_deploys_pipeline_change_only_to_control(tmp_path: Path) -> None:
+    base = write_manifest(
+        tmp_path,
+        "0.2.31.toml",
+        release_tag="0.2.31",
+        image_tag="0.2.31",
+    )
+    current = write_manifest(
+        tmp_path,
+        "0.2.32.toml",
+        release_tag="0.2.32",
+        image_tag="0.2.31",
+        overrides={"vn-news-pipelines": "8" * 40},
+    )
+
+    plan = create_release_plan(
+        current_manifest_path=current,
+        base_manifest_path=base,
+        catalog=CATALOG,
+    )
+
+    assert plan.changed_repositories == ["vn-news-pipelines"]
+    assert plan.publish_required is False
+    assert plan.deploy_data is False
+    assert plan.deploy_control is True
+    assert plan.deploy_processing is False
 
 
 def test_release_plan_ignores_cicd_manifest_only_change(
