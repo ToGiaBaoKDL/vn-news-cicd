@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 deploy_polaris() {
-  local bootstrap_marker="/var/lib/postgresql/data/.vn-news-polaris-bootstrap-complete"
+  local bootstrap_marker="/var/lib/postgresql/.vn-news-polaris-bootstrap-complete"
 
   compose_data pull polaris-db polaris
   compose_data --profile bootstrap pull polaris-bootstrap
