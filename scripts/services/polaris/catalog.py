@@ -61,7 +61,12 @@ def iceberg_schema(contract: IcebergTableContract) -> dict[str, Any]:
         if field.description:
             field_payload["doc"] = field.description
         fields.append(field_payload)
-    return {"type": "struct", "fields": fields}
+    return {
+        "type": "struct",
+        "schema-id": 0,
+        "identifier-field-ids": [],
+        "fields": fields,
+    }
 
 
 def iceberg_partition_spec(contract: IcebergTableContract) -> dict[str, Any]:
@@ -82,7 +87,7 @@ def iceberg_partition_spec(contract: IcebergTableContract) -> dict[str, Any]:
                 "transform": partition.transform,
             }
         )
-    return {"fields": partition_fields}
+    return {"spec-id": 0, "fields": partition_fields}
 
 
 def create_table_request(contract: IcebergTableContract, warehouse_uri: str) -> dict[str, Any]:

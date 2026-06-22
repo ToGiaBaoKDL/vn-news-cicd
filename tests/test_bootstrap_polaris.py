@@ -95,6 +95,8 @@ def test_create_table_request_is_derived_from_contract() -> None:
     assert request["location"] == "s3://curated-bucket/warehouse/curated/news_article_version"
     assert request["properties"] == dict(NEWS_ARTICLE_VERSION.properties)
     assert request["schema"]["type"] == "struct"
+    assert request["schema"]["schema-id"] == 0
+    assert request["schema"]["identifier-field-ids"] == []
     assert [field["id"] for field in request["schema"]["fields"]] == list(
         range(1, len(NEWS_ARTICLE_VERSION.fields) + 1)
     )
@@ -104,6 +106,7 @@ def test_create_table_request_is_derived_from_contract() -> None:
         "type": "string",
         "required": True,
     }
+    assert request["partition-spec"]["spec-id"] == 0
     assert request["partition-spec"]["fields"] == [
         {
             "field-id": 1000,
