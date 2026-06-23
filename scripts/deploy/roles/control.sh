@@ -13,11 +13,11 @@ deploy_control_role() {
 
   reset_role_state
   materialize_role_secrets
+  configure_role_operations
   deploy_spark_master
   validate_spark_master
   deploy_airflow
   validate_airflow
   deploy_app
   deploy_control_access
-  configure_role_operations
 }

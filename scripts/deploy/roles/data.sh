@@ -14,6 +14,7 @@ deploy_data_role() {
 
   reset_role_state
   materialize_role_secrets
+  configure_role_operations
   deploy_redpanda
   deploy_seaweedfs
   deploy_polaris
@@ -25,5 +26,4 @@ deploy_data_role() {
   provision_polaris_access
   validate_polaris_access
   deploy_data_access
-  configure_role_operations
 }
