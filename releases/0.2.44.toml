@@ -3,7 +3,7 @@ release_tag = "0.2.44"
 image_tag = "0.2.44"
 
 [repositories]
-vn-news-cicd = "2a175f576e46047768d496ba3a1ade0edb7c4159"
+vn-news-cicd = "3f011629ee61c4b90be8e2c57353efa202381695"
 vn-news-app = "8e3ad676283b91275463ce6f92fab6a1d69bd752"
 vn-news-config = "200c2f5ae0e0aacc3540a8c53e274fcbc46950d7"
 vn-news-infra = "c974df844b863f350efb3f77537a30195a6cd6fe"
