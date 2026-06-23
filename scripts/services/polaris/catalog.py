@@ -109,6 +109,8 @@ def create_catalog_request(config: PolarisCatalogConfig) -> dict[str, Any]:
         "pathStyleAccess": True,
         "region": config.storage_region,
     }
+    if config.storage_sts_unavailable:
+        storage_config["stsUnavailable"] = True
     optional_storage_fields = {
         "endpointInternal": config.storage_endpoint_internal_url,
         "stsEndpoint": config.storage_sts_endpoint_url,
@@ -175,8 +177,11 @@ def validate_existing_catalog(catalog: dict[str, Any], config: PolarisCatalogCon
         "Polaris S3 endpoint",
     )
     require_equal(storage_config.get("pathStyleAccess"), True, "Polaris S3 path-style access")
-    if storage_config.get("stsUnavailable") is True:
-        raise ValueError("Polaris catalog disables credential vending with stsUnavailable=true")
+    require_equal(
+        storage_config.get("stsUnavailable") is True,
+        config.storage_sts_unavailable,
+        "Polaris S3 stsUnavailable",
+    )
     allowed_locations = storage_config.get("allowedLocations") or []
     if config.warehouse_uri not in allowed_locations:
         raise ValueError(

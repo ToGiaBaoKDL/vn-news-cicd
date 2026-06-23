@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 from pathlib import Path
 
@@ -29,6 +30,7 @@ def catalog_config() -> polaris_client.PolarisCatalogConfig:
         storage_endpoint_url="http://seaweedfs:8333",
         storage_endpoint_internal_url=None,
         storage_sts_endpoint_url=None,
+        storage_sts_unavailable=False,
         storage_role_arn=None,
         storage_user_arn=None,
         storage_external_id=None,
@@ -115,6 +117,14 @@ def test_create_table_request_is_derived_from_contract() -> None:
             "transform": "day",
         }
     ]
+
+
+def test_create_catalog_request_can_disable_sts_for_s3_compatible_storage() -> None:
+    request = catalog.create_catalog_request(
+        dataclasses.replace(catalog_config(), storage_sts_unavailable=True)
+    )
+
+    assert request["catalog"]["storageConfigInfo"]["stsUnavailable"] is True
 
 
 def test_all_curated_table_requests_use_contract_names() -> None:

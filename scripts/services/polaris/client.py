@@ -37,6 +37,7 @@ class PolarisCatalogConfig:
     storage_endpoint_url: str
     storage_endpoint_internal_url: str | None
     storage_sts_endpoint_url: str | None
+    storage_sts_unavailable: bool
     storage_role_arn: str | None
     storage_user_arn: str | None
     storage_external_id: str | None
@@ -115,6 +116,11 @@ def add_catalog_arguments(parser: argparse.ArgumentParser) -> None:
         default=os.environ.get("VN_NEWS_POLARIS_STORAGE_STS_ENDPOINT_URL"),
     )
     parser.add_argument(
+        "--storage-sts-unavailable",
+        action=argparse.BooleanOptionalAction,
+        default=env_bool("VN_NEWS_POLARIS_STORAGE_STS_UNAVAILABLE"),
+    )
+    parser.add_argument(
         "--storage-role-arn",
         default=os.environ.get("VN_NEWS_POLARIS_STORAGE_ROLE_ARN"),
     )
@@ -162,6 +168,10 @@ def normalize_url(url: str | None, name: str) -> str:
     return url.rstrip("/")
 
 
+def env_bool(name: str) -> bool:
+    return os.environ.get(name, "").lower() in {"1", "true", "yes", "on"}
+
+
 def derive_warehouse_uri(settings: dict[str, Any], explicit_uri: str | None) -> str:
     if explicit_uri:
         normalized_uri = explicit_uri.rstrip("/")
@@ -200,6 +210,7 @@ def build_catalog_config(args: argparse.Namespace) -> PolarisCatalogConfig:
             if args.storage_sts_endpoint_url
             else None
         ),
+        storage_sts_unavailable=getattr(args, "storage_sts_unavailable", False),
         storage_role_arn=args.storage_role_arn or None,
         storage_user_arn=args.storage_user_arn or None,
         storage_external_id=args.storage_external_id or None,

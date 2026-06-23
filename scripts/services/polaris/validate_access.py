@@ -45,6 +45,18 @@ def validate_vended_credentials(payload: dict[str, Any], label: str) -> None:
 
 
 class PolarisAccessValidator(PolarisClient):
+    def validate_table_access(
+        self,
+        runtime_credentials: PolarisCredentials,
+        contract: IcebergTableContract,
+    ) -> None:
+        token = self.request_access_token(runtime_credentials)
+        headers = self.auth_headers_for(runtime_credentials, token)
+        table_url = table_catalog_url(self.config.catalog_url, self.config.catalog_name, contract)
+        response = self.client.get(table_url, headers=headers)
+        response.raise_for_status()
+        print(f"validated Polaris table access: {contract.identifier}")
+
     def validate_credential_vending(
         self,
         runtime_credentials: PolarisCredentials,
@@ -78,10 +90,11 @@ def main() -> None:
     config: PolarisCatalogConfig = build_catalog_config(args)
     runtime_credentials = load_runtime_credentials(args.runtime_credentials_file)
     with httpx.Client(timeout=config.timeout_seconds) as client:
-        PolarisAccessValidator(client, config, runtime_credentials).validate_credential_vending(
-            runtime_credentials,
-            CURATED_TABLE_CONTRACTS[0],
-        )
+        validator = PolarisAccessValidator(client, config, runtime_credentials)
+        if config.storage_sts_unavailable:
+            validator.validate_table_access(runtime_credentials, CURATED_TABLE_CONTRACTS[0])
+        else:
+            validator.validate_credential_vending(runtime_credentials, CURATED_TABLE_CONTRACTS[0])
 
 
 if __name__ == "__main__":
