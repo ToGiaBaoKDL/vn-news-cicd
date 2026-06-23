@@ -21,7 +21,13 @@ import json
 import sys
 
 expected_dag = sys.argv[1]
-dags = json.load(sys.stdin)
+output = sys.stdin.read()
+json_start = output.find("[")
+json_end = output.rfind("]")
+if json_start == -1 or json_end == -1 or json_end < json_start:
+    raise SystemExit(1)
+
+dags = json.loads(output[json_start : json_end + 1])
 raise SystemExit(not any(
     dag.get("dag_id") == expected_dag
     for dag in dags
