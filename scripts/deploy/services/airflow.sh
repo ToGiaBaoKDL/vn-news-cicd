@@ -22,12 +22,21 @@ import sys
 
 expected_dag = sys.argv[1]
 output = sys.stdin.read()
-json_start = output.find("[")
-json_end = output.rfind("]")
-if json_start == -1 or json_end == -1 or json_end < json_start:
+decoder = json.JSONDecoder()
+dags = None
+for json_start, character in enumerate(output):
+    if character != "[":
+        continue
+    try:
+        payload, _ = decoder.raw_decode(output[json_start:])
+    except json.JSONDecodeError:
+        continue
+    if isinstance(payload, list):
+        dags = payload
+        break
+if dags is None:
     raise SystemExit(1)
 
-dags = json.loads(output[json_start : json_end + 1])
 raise SystemExit(not any(
     dag.get("dag_id") == expected_dag
     for dag in dags
