@@ -6,9 +6,12 @@ deploy_redpanda() {
 }
 
 bootstrap_redpanda_topics() {
+  local rpk_command
+
+  rpk_command="docker compose --env-file $env_file -f $infra_root/compose.data.yaml exec -T redpanda rpk"
   run_cicd_module scripts.services.redpanda.bootstrap_topics \
-    --rpk-command "docker run --rm --entrypoint rpk ${REDPANDA_IMAGE:-redpandadata/redpanda:v26.1.9}" \
-    --brokers "$VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS" \
+    --rpk-command "$rpk_command" \
+    --brokers localhost:9092 \
     --disable-auto-create
 }
 

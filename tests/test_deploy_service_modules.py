@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from scripts.services.airflow import validate_dag
 from scripts.services.polaris import vault
 from scripts.services.spark import validate_cluster
+
+
+def test_redpanda_provisioning_uses_service_container_rpk() -> None:
+    deploy_script = Path("scripts/deploy/services/redpanda.sh").read_text(encoding="utf-8")
+
+    assert "exec -T redpanda rpk" in deploy_script
+    assert "--brokers localhost:9092" in deploy_script
+    assert "docker run --rm --entrypoint rpk" not in deploy_script
 
 
 def test_airflow_dag_validation_handles_prefixed_logs() -> None:
