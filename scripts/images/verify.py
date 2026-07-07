@@ -5,7 +5,7 @@ import json
 import subprocess
 
 from scripts.images.catalog import image_reference, load_image_catalog
-from scripts.release.tags import validate_tag
+from scripts.images.tags import validate_tag
 
 
 def manifest_platforms(manifest: dict) -> set[str]:

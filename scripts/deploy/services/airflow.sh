@@ -16,33 +16,8 @@ validate_airflow() {
     curl -fsS http://localhost:8080/api/v2/monitor/health >/dev/null
 
   for _ in $(seq 1 "$max_attempts"); do
-    if compose_control exec -T airflow-api-server airflow dags list --output json | python3 -c '
-import json
-import sys
-
-expected_dag = sys.argv[1]
-output = sys.stdin.read()
-decoder = json.JSONDecoder()
-dags = None
-for json_start, character in enumerate(output):
-    if character != "[":
-        continue
-    try:
-        payload, _ = decoder.raw_decode(output[json_start:])
-    except json.JSONDecodeError:
-        continue
-    if isinstance(payload, list):
-        dags = payload
-        break
-if dags is None:
-    raise SystemExit(1)
-
-raise SystemExit(not any(
-    dag.get("dag_id") == expected_dag
-    for dag in dags
-    if isinstance(dag, dict)
-))
-' "$expected_dag"; then
+    if compose_control exec -T airflow-api-server airflow dags list --output json \
+      | run_cicd_module scripts.services.airflow.validate_dag --expected-dag "$expected_dag"; then
       echo "validated Airflow DAG: $expected_dag"
       return
     fi

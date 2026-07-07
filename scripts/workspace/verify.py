@@ -7,7 +7,6 @@ import yaml
 from news_platform.config import load_settings, load_sources
 
 from scripts.paths import CICD_ROOT, WORKSPACE_ROOT
-from scripts.release.manifest import RELEASES_ROOT, load_release_manifest
 
 APP_ROOT = WORKSPACE_ROOT / "vn-news-app"
 CONFIG_ROOT = WORKSPACE_ROOT / "vn-news-config"
@@ -31,23 +30,21 @@ ACTION_REF_PATTERN = re.compile(r"uses:\s*([^@\s]+)@([^\s#]+)")
 IMMUTABLE_ACTION_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 REQUIRED_SCRIPT_MODULES = (
+    "scripts/deploy/refs.py",
     "scripts/images/build.py",
     "scripts/images/catalog.py",
-    "scripts/images/publish.py",
+    "scripts/images/tags.py",
     "scripts/images/verify.py",
-    "scripts/release/manifest.py",
-    "scripts/release/plan.py",
-    "scripts/release/prepare.py",
-    "scripts/release/refs.py",
-    "scripts/release/tags.py",
-    "scripts/services/polaris/bootstrap_catalog.py",
-    "scripts/services/polaris/catalog.py",
-    "scripts/services/polaris/client.py",
-    "scripts/services/polaris/provision_access.py",
-    "scripts/services/polaris/validate_access.py",
+    "scripts/services/airflow/validate_dag.py",
+    "scripts/services/polaris/cli.py",
+    "scripts/services/polaris/config.py",
+    "scripts/services/polaris/provision.py",
+    "scripts/services/polaris/validate.py",
+    "scripts/services/polaris/vault.py",
     "scripts/services/redpanda/bootstrap_topics.py",
     "scripts/services/redpanda/register_schemas.py",
     "scripts/services/seaweedfs/bootstrap_buckets.py",
+    "scripts/services/spark/validate_cluster.py",
     "scripts/workspace/verify.py",
 )
 REMOVED_SCRIPT_MODULES = (
@@ -56,12 +53,24 @@ REMOVED_SCRIPT_MODULES = (
     "scripts/bootstrap_topics.py",
     "scripts/build_images.py",
     "scripts/image_catalog.py",
+    "scripts/services/polaris/bootstrap_catalog.py",
+    "scripts/services/polaris/catalog.py",
+    "scripts/services/polaris/client.py",
     "scripts/services/polaris/common.py",
+    "scripts/services/polaris/provision_access.py",
+    "scripts/services/polaris/runtime_access.py",
+    "scripts/services/polaris/validate_access.py",
     "scripts/polaris_common.py",
     "scripts/prepare_release.py",
     "scripts/provision_polaris_access.py",
+    "scripts/images/publish.py",
     "scripts/publish_images.py",
     "scripts/register_event_schemas.py",
+    "scripts/release/manifest.py",
+    "scripts/release/plan.py",
+    "scripts/release/prepare.py",
+    "scripts/release/refs.py",
+    "scripts/release/tags.py",
     "scripts/release_manifest.py",
     "scripts/release_plan.py",
     "scripts/release_tags.py",
@@ -80,11 +89,16 @@ REQUIRED_DEPLOY_SERVICE_FILES = (
     "scripts/deploy/services/seaweedfs.sh",
     "scripts/deploy/services/spark.sh",
 )
-REMOVED_DEPLOY_SERVICE_FILES = ("scripts/deploy/services/processing.sh",)
+REMOVED_DEPLOY_SERVICE_FILES = (
+    "scripts/deploy/lib/vault.sh",
+    "scripts/deploy/services/processing.sh",
+)
 REQUIRED_INFRA_DEPLOY_FILES = (
+    "scripts/host/bootstrap.sh",
     "scripts/host/configure_operations.sh",
     "scripts/host/reset_role.sh",
     "scripts/lib/common.sh",
+    "scripts/lib/firewall.sh",
     "scripts/lib/oci.sh",
     "scripts/resource_manager/job.sh",
     "scripts/secrets/materialize.sh",
@@ -104,14 +118,6 @@ def read_env_template(path: Path) -> dict[str, str]:
         key, value = stripped.split("=", maxsplit=1)
         values[key] = value
     return values
-
-
-def validate_release_manifests() -> None:
-    manifests = sorted(RELEASES_ROOT.glob("*.toml"))
-    if not manifests:
-        raise ValueError("releases/ must contain at least one release manifest")
-    for path in manifests:
-        load_release_manifest(path)
 
 
 def validate_workflow_action_ref(path: Path, action: str, ref: str) -> None:
@@ -134,7 +140,11 @@ def validate_workflow_action_pins() -> None:
                     validate_workflow_action_ref(path.relative_to(WORKSPACE_ROOT), action, ref)
 
 
-def validate_release_identity_usage() -> None:
+def validate_deployment_identity_usage() -> None:
+    stale_release_root = CICD_ROOT / "releases"
+    if stale_release_root.exists():
+        raise ValueError("releases/ must stay removed; deployment identity is commit refs")
+
     compose_paths = [APP_ROOT / "compose.yaml", *INFRA_ROOT.rglob("compose*.yaml")]
     for path in compose_paths:
         if not path.is_file():
@@ -147,21 +157,29 @@ def validate_release_identity_usage() -> None:
     for role in ("data", "control", "processing"):
         env_template = INFRA_ROOT / "env" / f"{role}.env.example"
         content = env_template.read_text(encoding="utf-8")
-        for variable in ("VN_NEWS_RELEASE_TAG", "VN_NEWS_IMAGE_TAG"):
-            if content.count(f"{variable}=") != 1:
-                raise ValueError(f"{env_template} must define {variable} exactly once")
+        if content.count("VN_NEWS_IMAGE_TAG=") != 1:
+            raise ValueError(f"{env_template} must define VN_NEWS_IMAGE_TAG exactly once")
+        if "VN_NEWS_RELEASE_TAG=" in content:
+            raise ValueError(f"{env_template} must not define VN_NEWS_RELEASE_TAG")
 
-    deploy_script = (CICD_ROOT / "scripts" / "deploy" / "production.sh").read_text(encoding="utf-8")
-    for variable in ("VN_NEWS_DEPLOY_RELEASE_TAG", "VN_NEWS_DEPLOY_IMAGE_TAG"):
-        if variable not in deploy_script:
-            raise ValueError(f"scripts/deploy/production.sh must pass {variable}")
+    for relative_path in (
+        "scripts/deploy/production.sh",
+        "scripts/deploy/lib/context.sh",
+        ".github/workflows/deploy-production.yaml",
+    ):
+        content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
+        for variable in ("VN_NEWS_DEPLOY_RELEASE_TAG", "VN_NEWS_DEPLOY_IMAGE_TAG"):
+            if variable in content:
+                raise ValueError(f"{relative_path} must not use {variable}")
 
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
     )
-    for variable in ("VN_NEWS_IMAGE_REGISTRY", "VN_NEWS_IMAGE_NAMESPACE"):
+    for variable in ("VN_NEWS_IMAGE_TAG", "VN_NEWS_IMAGE_REGISTRY", "VN_NEWS_IMAGE_NAMESPACE"):
         if f"set_role_env_value {variable}" not in deploy_context:
             raise ValueError(f"deployment context must persist {variable}")
+    if "write_deployment_metadata" not in deploy_context:
+        raise ValueError("deployment context must persist deployed commit metadata")
 
 
 def validate_script_layout() -> None:
@@ -226,6 +244,11 @@ def validate_image_catalog() -> None:
 
 
 def validate_image_build(image_key: str, build: dict) -> None:
+    allowed_fields = {"additional_contexts", "context", "dockerfile"}
+    extra_fields = sorted(set(build) - allowed_fields)
+    if extra_fields:
+        raise ValueError(f"Image {image_key} build has unused fields: {extra_fields}")
+
     context = build.get("context")
     context_path = WORKSPACE_ROOT / str(context)
     if context is None or not context_path.is_dir():
@@ -328,9 +351,8 @@ def validate_settings_load() -> None:
 
 
 def main() -> None:
-    validate_release_manifests()
     validate_workflow_action_pins()
-    validate_release_identity_usage()
+    validate_deployment_identity_usage()
     validate_script_layout()
     validate_image_catalog()
     validate_role_env_templates()

@@ -26,7 +26,6 @@ run_role() {
 
   case "$role" in
     data)
-      source "$script_dir/lib/vault.sh"
       source "$script_dir/services/cloudflare.sh"
       source "$script_dir/services/polaris.sh"
       source "$script_dir/services/redpanda.sh"
@@ -53,31 +52,73 @@ run_role() {
       exit 1
       ;;
   esac
+  write_deployment_metadata
 }
 
 prepare_streamed_deploy() {
-  local role="${1:?role is required}"
-  local release_tag="${2:?release tag is required}"
-  local image_tag="${3:?image tag is required}"
-  local infra_ref="${4:?infra ref is required}"
-  local config_ref cicd_ref
+  local role="" image_tag="" infra_ref="" config_ref="" cicd_ref=""
+  local app_ref="" orchestration_ref="" pipelines_ref="" platform_lib_ref=""
+
+  while (($# > 0)); do
+    case "$1" in
+      --role)
+        role="${2:?--role requires a value}"
+        shift 2
+        ;;
+      --image-tag)
+        image_tag="${2:?--image-tag requires a value}"
+        shift 2
+        ;;
+      --infra-ref)
+        infra_ref="${2:?--infra-ref requires a value}"
+        shift 2
+        ;;
+      --config-ref)
+        config_ref="${2:?--config-ref requires a value}"
+        shift 2
+        ;;
+      --cicd-ref)
+        cicd_ref="${2:?--cicd-ref requires a value}"
+        shift 2
+        ;;
+      --app-ref)
+        app_ref="${2:?--app-ref requires a value}"
+        shift 2
+        ;;
+      --orchestration-ref)
+        orchestration_ref="${2:?--orchestration-ref requires a value}"
+        shift 2
+        ;;
+      --pipelines-ref)
+        pipelines_ref="${2:?--pipelines-ref requires a value}"
+        shift 2
+        ;;
+      --platform-lib-ref)
+        platform_lib_ref="${2:?--platform-lib-ref requires a value}"
+        shift 2
+        ;;
+      *)
+        echo "Unknown deploy argument: $1" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  : "${role:?--role is required}"
+  : "${image_tag:?--image-tag is required}"
+  : "${infra_ref:?--infra-ref is required}"
+  : "${config_ref:?--config-ref is required}"
+  : "${cicd_ref:?--cicd-ref is required}"
+  : "${platform_lib_ref:?--platform-lib-ref is required}"
 
   case "$role" in
-    data)
-      config_ref="${5:?config ref is required}"
-      cicd_ref="${6:?cicd ref is required}"
-      export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="${7:?platform lib ref is required}"
-      ;;
+    data) ;;
     control)
-      config_ref="${5:?config ref is required}"
-      cicd_ref="${6:?cicd ref is required}"
-      export VN_NEWS_DEPLOY_ORCHESTRATION_REF="${7:?orchestration ref is required}"
-      export VN_NEWS_DEPLOY_APP_REF="${8:?app ref is required}"
-      export VN_NEWS_DEPLOY_PIPELINES_REF="${9:?pipelines ref is required}"
+      export VN_NEWS_DEPLOY_ORCHESTRATION_REF="${orchestration_ref:?--orchestration-ref is required}"
+      export VN_NEWS_DEPLOY_APP_REF="${app_ref:?--app-ref is required}"
+      export VN_NEWS_DEPLOY_PIPELINES_REF="${pipelines_ref:?--pipelines-ref is required}"
       ;;
     processing)
-      config_ref="${5:?config ref is required}"
-      cicd_ref="${6:-${VN_NEWS_CICD_REF:-main}}"
       ;;
     *)
       echo "Unknown deployment role: $role" >&2
@@ -90,10 +131,10 @@ prepare_streamed_deploy() {
 
   export VN_NEWS_DEPLOY_INTERNAL=1
   export VN_NEWS_DEPLOY_ROLE="$role"
-  export VN_NEWS_DEPLOY_RELEASE_TAG="$release_tag"
-  export VN_NEWS_DEPLOY_IMAGE_TAG="$image_tag"
+  export VN_NEWS_IMAGE_TAG="$image_tag"
   export VN_NEWS_DEPLOY_INFRA_REF="$infra_ref"
   export VN_NEWS_DEPLOY_CONFIG_REF="$config_ref"
+  export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="$platform_lib_ref"
 
   exec bash "$repos_root/vn-news-cicd/scripts/deploy/production.sh"
 }

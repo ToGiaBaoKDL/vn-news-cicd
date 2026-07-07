@@ -21,8 +21,8 @@ validate_spark_master() {
   local master_host="${VN_NEWS_CONTROL_PRIVATE_IP:?set VN_NEWS_CONTROL_PRIVATE_IP}"
   local master_ui_port="${VN_NEWS_SPARK_MASTER_UI_PORT:?set VN_NEWS_SPARK_MASTER_UI_PORT}"
 
-  curl -fsS "http://$master_host:$master_ui_port/json/" | python3 -m json.tool >/dev/null
-  echo "validated Spark master: $master_host:$master_ui_port"
+  run_cicd_module scripts.services.spark.validate_cluster master \
+    --master-url "http://$master_host:$master_ui_port/json/"
 }
 
 validate_spark_worker_registered() {
@@ -33,25 +33,9 @@ validate_spark_worker_registered() {
   local worker_host="${VN_NEWS_PROCESSING_PRIVATE_IP:?set VN_NEWS_PROCESSING_PRIVATE_IP}"
 
   master_host="$(spark_master_host)"
-  for _ in $(seq 1 "$max_attempts"); do
-    if curl -fsS "http://$master_host:$master_ui_port/json/" | python3 -c '
-import json
-import sys
-
-worker_host = sys.argv[1]
-workers = json.load(sys.stdin).get("workers", [])
-raise SystemExit(not any(
-    worker.get("host") == worker_host and worker.get("state") == "ALIVE"
-    for worker in workers
-    if isinstance(worker, dict)
-))
-' "$worker_host"; then
-      echo "validated Spark worker registration: $worker_host -> $master_host:$master_ui_port"
-      return
-    fi
-    sleep "$sleep_seconds"
-  done
-
-  echo "Spark worker is not registered as ALIVE on master: $worker_host" >&2
-  exit 1
+  run_cicd_module scripts.services.spark.validate_cluster worker \
+    --master-url "http://$master_host:$master_ui_port/json/" \
+    --worker-host "$worker_host" \
+    --attempts "$max_attempts" \
+    --sleep-seconds "$sleep_seconds"
 }

@@ -2,8 +2,7 @@
 # shellcheck disable=SC2030,SC2031
 
 role="${VN_NEWS_DEPLOY_ROLE:?VN_NEWS_DEPLOY_ROLE is required}"
-release_tag="${VN_NEWS_DEPLOY_RELEASE_TAG:?VN_NEWS_DEPLOY_RELEASE_TAG is required}"
-image_tag="${VN_NEWS_DEPLOY_IMAGE_TAG:?VN_NEWS_DEPLOY_IMAGE_TAG is required}"
+image_tag="${VN_NEWS_IMAGE_TAG:?VN_NEWS_IMAGE_TAG is required}"
 infra_ref="${VN_NEWS_DEPLOY_INFRA_REF:?VN_NEWS_DEPLOY_INFRA_REF is required}"
 config_ref="${VN_NEWS_DEPLOY_CONFIG_REF:-}"
 platform_lib_ref="${VN_NEWS_DEPLOY_PLATFORM_LIB_REF:-}"
@@ -14,6 +13,7 @@ repo_owner="${VN_NEWS_GITHUB_OWNER:-ToGiaBaoKDL}"
 infra_root="$repos_root/vn-news-infra"
 cicd_root="$repos_root/vn-news-cicd"
 env_file="${VN_NEWS_ENV_FILE:-/etc/vn-news/env/${role}.env}"
+deployment_metadata_file="${VN_NEWS_DEPLOYMENT_METADATA_FILE:-/etc/vn-news/deployment.json}"
 
 checkout_repo() {
   local repo_name="$1"
@@ -51,15 +51,6 @@ checkout_pipelines_repo() {
   checkout_repo vn-news-pipelines "$pipelines_ref"
 }
 
-require_command() {
-  local command_name="$1"
-
-  if ! command -v "$command_name" >/dev/null 2>&1; then
-    echo "$command_name is required on the $role node" >&2
-    exit 1
-  fi
-}
-
 load_role_env() {
   if [[ ! -f "$env_file" ]]; then
     echo "Missing host configuration: $env_file" >&2
@@ -71,7 +62,6 @@ load_role_env() {
   source "$env_file"
   set +a
 
-  export VN_NEWS_RELEASE_TAG="$release_tag"
   export VN_NEWS_IMAGE_TAG="$image_tag"
   export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
 }
@@ -96,6 +86,16 @@ load_image_env() {
   fi
 }
 
+require_file() {
+  local path="$1"
+  local label="$2"
+
+  if [[ ! -f "$path" ]]; then
+    echo "Missing $label: $path" >&2
+    exit 1
+  fi
+}
+
 set_role_env_value() {
   local key="$1"
   local value="$2"
@@ -107,15 +107,94 @@ set_role_env_value() {
 prepare_deploy_context() {
   mkdir -p "$repos_root"
   checkout_repo vn-news-infra "$infra_ref"
+  checkout_config_repo
+  checkout_platform_lib_repo
   load_role_env
-  set_role_env_value VN_NEWS_RELEASE_TAG "$release_tag"
   set_role_env_value VN_NEWS_IMAGE_TAG "$image_tag"
   if [[ "$role" != "data" ]]; then
     load_image_env
     set_role_env_value VN_NEWS_IMAGE_REGISTRY "$VN_NEWS_IMAGE_REGISTRY"
     set_role_env_value VN_NEWS_IMAGE_NAMESPACE "$VN_NEWS_IMAGE_NAMESPACE"
   fi
-  echo "deployment context: role=$role release=$release_tag image=$image_tag"
+  set_config_paths
+  prepare_cicd_python
+  echo "deployment context: role=$role image=$image_tag"
+}
+
+repo_commit() {
+  local repo_name="$1"
+  local repo_dir="$repos_root/$repo_name"
+
+  if [[ -d "$repo_dir/.git" ]]; then
+    git -C "$repo_dir" rev-parse HEAD
+  fi
+}
+
+write_deployment_metadata() {
+  local metadata_tmp deployed_at repo_name commit_ref repositories
+  local -a repo_names
+
+  deployed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  metadata_tmp="$(mktemp)"
+  repositories=""
+  case "$role" in
+    data)
+      repo_names=(vn-news-cicd vn-news-config vn-news-infra vn-news-platform-lib)
+      ;;
+    control)
+      repo_names=(
+        vn-news-app
+        vn-news-cicd
+        vn-news-config
+        vn-news-infra
+        vn-news-pipelines
+        vn-news-platform-lib
+      )
+      ;;
+    processing)
+      repo_names=(vn-news-cicd vn-news-config vn-news-infra vn-news-platform-lib)
+      ;;
+  esac
+
+  for repo_name in "${repo_names[@]}"; do
+    commit_ref="$(repo_commit "$repo_name")"
+    [[ -n "$commit_ref" ]] || continue
+    repositories+="${repo_name}=${commit_ref}"$'\n'
+  done
+
+  VN_NEWS_DEPLOY_METADATA_DEPLOYED_AT="$deployed_at" \
+    VN_NEWS_DEPLOY_METADATA_REPOSITORIES="$repositories" \
+    python3 - "$metadata_tmp" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+repositories = {}
+for line in os.environ.get("VN_NEWS_DEPLOY_METADATA_REPOSITORIES", "").splitlines():
+    repo_name, commit_ref = line.split("=", maxsplit=1)
+    repositories[repo_name] = commit_ref
+
+payload = {
+    "role": os.environ["VN_NEWS_DEPLOY_ROLE"],
+    "image_tag": os.environ["VN_NEWS_IMAGE_TAG"],
+    "deployed_at": os.environ["VN_NEWS_DEPLOY_METADATA_DEPLOYED_AT"],
+    "repositories": repositories,
+}
+if os.environ["VN_NEWS_DEPLOY_ROLE"] == "control":
+    payload["configured_refs"] = {
+        "vn-news-orchestration": os.environ.get("VN_NEWS_DEPLOY_ORCHESTRATION_REF", "")
+    }
+
+Path(sys.argv[1]).write_text(
+    json.dumps(payload, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PY
+
+  sudo install -d -m 0755 "$(dirname "$deployment_metadata_file")"
+  sudo install -m 0644 "$metadata_tmp" "$deployment_metadata_file"
+  rm -f "$metadata_tmp"
 }
 
 materialize_role_secrets() {

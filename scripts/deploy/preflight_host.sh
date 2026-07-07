@@ -36,16 +36,11 @@ case "$role" in
   *) fail "unknown role: $role" ;;
 esac
 
-for command_name in docker git sudo; do
+for command_name in docker git python3 sudo uv; do
   require_command "$command_name"
 done
-if [[ "$role" == "data" ]]; then
-  require_command uv
-  require_command python3
-fi
 if [[ "$role" == "control" || "$role" == "processing" ]]; then
   require_command curl
-  require_command python3
 fi
 docker info >/dev/null 2>&1 || fail "Docker daemon is unavailable"
 sudo -n true >/dev/null 2>&1 || fail "passwordless sudo is unavailable"

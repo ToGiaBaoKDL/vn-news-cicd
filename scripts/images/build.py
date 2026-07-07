@@ -5,8 +5,8 @@ import shlex
 import subprocess
 
 from scripts.images.catalog import image_reference, load_image_catalog
+from scripts.images.tags import validate_tag
 from scripts.paths import WORKSPACE_ROOT
-from scripts.release.tags import validate_tag
 
 
 def parse_args() -> argparse.Namespace:

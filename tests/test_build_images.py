@@ -10,7 +10,7 @@ def test_validate_tag_accepts_immutable_tags(tag: str) -> None:
 
 
 def test_validate_tag_rejects_latest_for_publish() -> None:
-    with pytest.raises(ValueError, match="immutable release tag"):
+    with pytest.raises(ValueError, match="immutable image tag"):
         validate_tag("latest", push=True)
 
 
