@@ -28,16 +28,22 @@ def test_commit_ref_detection_accepts_uppercase_sha() -> None:
     assert refs.is_commit_ref("A" * 40)
 
 
-def test_bundle_image_tag_is_deterministic() -> None:
-    repositories = {
-        "vn-news-config": "b" * 40,
-        "vn-news-app": "a" * 40,
-    }
+def test_image_tag_from_manifest_accepts_explicit_tag() -> None:
+    assert refs.image_tag_from_manifest("bundle-abc123", "") == "bundle-abc123"
 
-    assert refs.bundle_image_tag(repositories) == refs.bundle_image_tag(
-        dict(reversed(repositories.items()))
+
+def test_image_tag_from_manifest_accepts_json_manifest() -> None:
+    assert (
+        refs.image_tag_from_manifest("", '{"image_tag":"bundle-ed750e7c6400d6f3"}')
+        == "bundle-ed750e7c6400d6f3"
     )
-    assert refs.bundle_image_tag(repositories).startswith("bundle-")
+
+
+def test_image_tag_from_manifest_accepts_text_manifest() -> None:
+    assert (
+        refs.image_tag_from_manifest("", "image_tag=bundle-ed750e7c6400d6f3")
+        == "bundle-ed750e7c6400d6f3"
+    )
 
 
 def test_resolve_deploy_refs_uses_explicit_image_tag(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -57,13 +63,16 @@ def test_resolve_deploy_refs_uses_explicit_image_tag(monkeypatch: pytest.MonkeyP
         default_ref="main",
         ref_overrides={},
         image_tag="sha-123",
+        image_manifest="",
     )
 
     assert image_tag == "sha-123"
     assert repositories == commits
 
 
-def test_resolve_deploy_refs_derives_bundle_image_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_deploy_refs_requires_existing_image_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commits = {
         repo_name: f"{index:040x}" for index, repo_name in enumerate(refs.REPOSITORIES, start=1)
     }
@@ -74,15 +83,14 @@ def test_resolve_deploy_refs_derives_bundle_image_tag(monkeypatch: pytest.Monkey
         lambda _owner, repo_name, _ref: commits[repo_name],
     )
 
-    image_tag, repositories = refs.resolve_deploy_refs(
-        owner="example",
-        default_ref="main",
-        ref_overrides={"vn-news-app": "feature"},
-        image_tag="",
-    )
-
-    assert image_tag == refs.bundle_image_tag(commits)
-    assert repositories == commits
+    with pytest.raises(ValueError, match="deploy does not build images"):
+        refs.resolve_deploy_refs(
+            owner="example",
+            default_ref="main",
+            ref_overrides={"vn-news-app": "feature"},
+            image_tag="",
+            image_manifest="",
+        )
 
 
 def test_write_github_output_uses_workflow_safe_names(tmp_path: Path) -> None:

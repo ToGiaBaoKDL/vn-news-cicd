@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
+import json
 import os
 import subprocess
 import tempfile
@@ -117,9 +117,52 @@ def resolve_remote_ref(owner: str, repo_name: str, ref: str) -> str:
     raise ValueError(f"{repo_name} ref is not resolvable from GitHub: {ref}")
 
 
-def bundle_image_tag(repositories: dict[str, str]) -> str:
-    payload = "\n".join(f"{name}={repositories[name]}" for name in sorted(repositories))
-    return f"bundle-{hashlib.sha256(payload.encode()).hexdigest()[:16]}"
+def image_tag_from_manifest(image_tag: str, image_manifest: str) -> str:
+    explicit_tag = image_tag.strip()
+    manifest = image_manifest.strip()
+    if explicit_tag and manifest:
+        raise ValueError("Use either image_tag or image_manifest, not both")
+    if explicit_tag:
+        validate_tag(explicit_tag, push=True)
+        return explicit_tag
+    if not manifest:
+        raise ValueError("image_tag or image_manifest is required; deploy does not build images")
+
+    if manifest.startswith("{"):
+        payload = json.loads(manifest)
+        if not isinstance(payload, dict):
+            raise ValueError("image_manifest JSON must be an object")
+        manifest_tag = payload.get("image_tag") or payload.get("tag")
+    else:
+        manifest_tag = parse_text_manifest_image_tag(manifest)
+
+    if not isinstance(manifest_tag, str) or not manifest_tag.strip():
+        raise ValueError("image_manifest must define image_tag")
+    resolved_tag = manifest_tag.strip()
+    validate_tag(resolved_tag, push=True)
+    return resolved_tag
+
+
+def parse_text_manifest_image_tag(manifest: str) -> str:
+    entries = [
+        entry.strip()
+        for chunk in manifest.splitlines()
+        for entry in chunk.split(",")
+        if entry.strip()
+    ]
+    if len(entries) == 1 and "=" not in entries[0] and ":" not in entries[0]:
+        return entries[0]
+
+    values: dict[str, str] = {}
+    for entry in entries:
+        if "=" in entry:
+            key, value = entry.split("=", maxsplit=1)
+        elif ":" in entry:
+            key, value = entry.split(":", maxsplit=1)
+        else:
+            raise ValueError(f"Invalid image_manifest entry: {entry}")
+        values[key.strip()] = value.strip()
+    return values.get("image_tag") or values.get("tag") or ""
 
 
 def resolve_deploy_refs(
@@ -128,14 +171,13 @@ def resolve_deploy_refs(
     default_ref: str,
     ref_overrides: dict[str, str],
     image_tag: str,
+    image_manifest: str,
 ) -> tuple[str, dict[str, str]]:
     repositories = {
         repo_name: resolve_remote_ref(owner, repo_name, ref_overrides.get(repo_name, default_ref))
         for repo_name in REPOSITORIES
     }
-    resolved_image_tag = image_tag or bundle_image_tag(repositories)
-    validate_tag(resolved_image_tag, push=True)
-    return resolved_image_tag, repositories
+    return image_tag_from_manifest(image_tag, image_manifest), repositories
 
 
 def write_github_output(image_tag: str, repositories: dict[str, str], path: Path) -> None:
@@ -154,6 +196,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ref", action="append", default=[], help="Override repo ref: repo=ref")
     parser.add_argument("--refs", default="", help="Comma or newline separated repo=ref overrides.")
     parser.add_argument("--image-tag", default="")
+    parser.add_argument("--image-manifest", default="")
     parser.add_argument("--github-output", type=Path)
     return parser.parse_args()
 
@@ -165,6 +208,7 @@ def main() -> None:
         default_ref=args.default_ref,
         ref_overrides=parse_ref_overrides(args.ref, args.refs),
         image_tag=args.image_tag.strip(),
+        image_manifest=args.image_manifest.strip(),
     )
     if args.github_output:
         write_github_output(image_tag, repositories, args.github_output)

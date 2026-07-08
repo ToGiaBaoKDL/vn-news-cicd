@@ -4,7 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Optional immutable image tag. Leave empty to use a bundle hash from resolved refs.
+        description: Published immutable image tag shorthand. Required if image_manifest is empty.
+        required: false
+        default: ""
+        type: string
+      image_manifest:
+        description: Published image manifest JSON or key-value text. Must include image_tag unless image_tag is set.
         required: false
         default: ""
         type: string
@@ -58,18 +63,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           DEFAULT_REF: ${{ inputs.default_ref }}
           IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
           REPO_REFS: ${{ inputs.repo_refs }}
         run: |
           uv run --no-project --python 3.12 python -m scripts.deploy.refs \
             --default-ref "$DEFAULT_REF" \
             --refs "$REPO_REFS" \
             --image-tag "$IMAGE_TAG" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --github-output "$GITHUB_OUTPUT"
 
-  publish-images:
+  verify-images:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
     environment: production
     steps:
       - name: Check out CI/CD
@@ -144,9 +151,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
 
-      - name: Expose GitHub Actions cache runtime
-        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
-
       - name: Validate assembled workspace
         working-directory: vn-news-cicd
         env:
@@ -163,24 +167,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push images
-        working-directory: vn-news-cicd
-        env:
-          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
-        run: |
-          uv run python -m scripts.images.build \
-            --tag "$IMAGE_TAG" \
-            --push \
-            --github-actions-cache
-
-      - name: Verify published images
+      - name: Verify deployment images
         working-directory: vn-news-cicd
         env:
           IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
         run: uv run python -m scripts.images.verify --tag "$IMAGE_TAG"
 
   deploy-data:
-    needs: [plan, publish-images]
+    needs: [plan, verify-images]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -222,7 +216,7 @@ jobs:
             < scripts/deploy/production.sh
 
   deploy-control:
-    needs: [plan, publish-images, deploy-data]
+    needs: [plan, verify-images, deploy-data]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -270,7 +264,7 @@ jobs:
             < scripts/deploy/production.sh
 
   deploy-processing:
-    needs: [plan, publish-images, deploy-data, deploy-control]
+    needs: [plan, verify-images, deploy-data, deploy-control]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production

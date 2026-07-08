@@ -65,11 +65,11 @@ def test_processing_deploy_waits_for_data_and_spark_master() -> None:
 
     assert set(workflow["jobs"]["deploy-processing"]["needs"]) == {
         "plan",
-        "publish-images",
+        "verify-images",
         "deploy-data",
         "deploy-control",
     }
-    assert "verify-images" not in workflow["jobs"]
+    assert "publish-images" not in workflow["jobs"]
 
 
 def test_deploy_uses_single_image_tag() -> None:
@@ -96,12 +96,13 @@ def test_deploy_uses_single_image_tag() -> None:
     validate_deployment_identity_usage()
 
 
-def test_deploy_workflow_enables_github_actions_build_cache() -> None:
+def test_deploy_workflow_verifies_existing_images_without_building() -> None:
     workflow = Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
 
-    assert "--github-actions-cache" in workflow
-    assert "crazy-max/ghaction-github-runtime@" in workflow
-    assert "python -m scripts.images.build" in workflow
+    assert "verify-images:" in workflow
+    assert "--github-actions-cache" not in workflow
+    assert "crazy-max/ghaction-github-runtime@" not in workflow
+    assert "python -m scripts.images.build" not in workflow
     assert "python -m scripts.images.publish" not in workflow
     assert "python -m scripts.images.verify" in workflow
     assert "--from-tag" not in workflow

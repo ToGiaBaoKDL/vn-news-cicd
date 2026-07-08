@@ -172,6 +172,16 @@ def validate_deployment_identity_usage() -> None:
             if variable in content:
                 raise ValueError(f"{relative_path} must not use {variable}")
 
+    deploy_workflow = (CICD_ROOT / ".github" / "workflows" / "deploy-production.yaml").read_text(
+        encoding="utf-8"
+    )
+    if "publish-images:" in deploy_workflow:
+        raise ValueError("deploy workflow must verify existing images instead of publishing")
+    if "python -m scripts.images.build" in deploy_workflow:
+        raise ValueError("deploy workflow must not build images")
+    if "python -m scripts.images.verify" not in deploy_workflow:
+        raise ValueError("deploy workflow must verify deployment images")
+
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
     )
