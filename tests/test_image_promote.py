@@ -43,6 +43,24 @@ def test_promoted_manifest_merges_partial_updates_into_base() -> None:
     }
 
 
+def test_promoted_manifest_accepts_base_only_for_rollback() -> None:
+    base = (
+        '{"api":"'
+        + digest_ref("vn-news-api", "a")
+        + '","web":"'
+        + digest_ref("vn-news-web", "b")
+        + '","worker":"'
+        + digest_ref("vn-news-worker", "c")
+        + '"}'
+    )
+
+    assert promoted_image_manifest(catalog=catalog(), base_manifest=base) == {
+        "api": digest_ref("vn-news-api", "a"),
+        "web": digest_ref("vn-news-web", "b"),
+        "worker": digest_ref("vn-news-worker", "c"),
+    }
+
+
 def test_promoted_manifest_accepts_complete_artifact_set_without_base() -> None:
     app = '{"api":"' + digest_ref("vn-news-api", "a") + '"}'
     web = '{"web":"' + digest_ref("vn-news-web", "b") + '"}'
@@ -65,23 +83,4 @@ def test_promoted_manifest_rejects_duplicate_updates() -> None:
         promoted_image_manifest(
             catalog=catalog(),
             update_manifests=(update, update),
-        )
-
-
-def test_promoted_manifest_rejects_manual_with_artifacts() -> None:
-    manifest = (
-        '{"api":"'
-        + digest_ref("vn-news-api", "a")
-        + '","web":"'
-        + digest_ref("vn-news-web", "b")
-        + '","worker":"'
-        + digest_ref("vn-news-worker", "c")
-        + '"}'
-    )
-
-    with pytest.raises(ValueError, match="manual image_manifest"):
-        promoted_image_manifest(
-            catalog=catalog(),
-            manual_manifest=manifest,
-            update_manifests=('{"api":"' + digest_ref("vn-news-api", "d") + '"}',),
         )

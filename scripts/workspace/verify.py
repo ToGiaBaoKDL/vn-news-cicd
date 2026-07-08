@@ -151,12 +151,23 @@ def validate_deployment_identity_usage() -> None:
         raise ValueError("deploy workflow must verify deployment images")
     if "digest-pinned image refs" not in deploy_workflow.lower():
         raise ValueError("deploy workflow must document digest-pinned image manifests")
+    for stale_fragment in (
+        "base_deploy_run_id",
+        "base_image_manifest",
+        "inputs.image_manifest",
+        "--manual",
+        '--base "$',
+    ):
+        if stale_fragment in deploy_workflow:
+            raise ValueError(f"deploy workflow contains stale manifest fallback: {stale_fragment}")
     for fragment in (
         "actions/download-artifact@",
         "actions/upload-artifact@",
         "python -m scripts.images.artifacts",
         "python -m scripts.images.promote",
+        "production_manifest_run_id",
         "production-image-manifest",
+        "image-manifests/base",
         "image-manifests/updates",
         "steps.artifacts.outputs.app_manifest_run_id",
         "steps.artifacts.outputs.infra_manifest_run_id",

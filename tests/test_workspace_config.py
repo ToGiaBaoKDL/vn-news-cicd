@@ -73,9 +73,15 @@ def test_processing_deploy_waits_for_data_and_spark_master() -> None:
 
 
 def test_deploy_uses_image_manifest() -> None:
-    workflow = yaml.safe_load(
-        Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
-    )
+    workflow_text = Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(workflow_text)
+    workflow_dispatch = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+    inputs = workflow_dispatch["on"]["workflow_dispatch"]["inputs"]
+    assert "production_manifest_run_id:" in workflow_text
+    assert "production_manifest_run_id" in inputs
+    assert "image_manifest" not in inputs
+    assert "base_image_manifest" not in inputs
+    assert "base_deploy_run_id" not in inputs
 
     for job_name in ("deploy-data", "deploy-control", "deploy-processing"):
         deploy_step = next(

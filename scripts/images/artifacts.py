@@ -84,18 +84,10 @@ def resolve_manifest_run_ids(
     artifact_name: str,
     token: str,
     provided_run_ids: dict[str, str],
-    manual_manifest: str = "",
-    base_manifest: str = "",
-    base_run_id: str = "",
+    production_run_id: str = "",
 ) -> dict[str, str]:
     provided = {key: value.strip() for key, value in provided_run_ids.items()}
-    provided_artifacts = {key: value for key, value in provided.items() if value}
-    if manual_manifest.strip() and (base_manifest.strip() or base_run_id or provided_artifacts):
-        raise ValueError("manual image_manifest cannot be combined with promotion artifacts")
-    if base_manifest.strip() and base_run_id:
-        raise ValueError("Use only one base manifest source")
-
-    should_discover = not manual_manifest.strip() and not base_manifest.strip() and not base_run_id
+    should_discover = not production_run_id.strip()
     resolved: dict[str, str] = {}
     for key, repo in SOURCE_REPOSITORIES.items():
         run_id = provided.get(key, "")
@@ -123,9 +115,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--branch", default="main")
     parser.add_argument("--workflow-name", default="Publish Images")
     parser.add_argument("--artifact-name", default="image-manifest")
-    parser.add_argument("--manual-manifest", default="")
-    parser.add_argument("--base-manifest", default="")
-    parser.add_argument("--base-run-id", default="")
+    parser.add_argument("--production-run-id", default="")
     parser.add_argument("--app-run-id", default="")
     parser.add_argument("--infra-run-id", default="")
     parser.add_argument("--services-run-id", default="")
@@ -149,9 +139,7 @@ def main() -> None:
             "infra": args.infra_run_id,
             "services": args.services_run_id,
         },
-        manual_manifest=args.manual_manifest,
-        base_manifest=args.base_manifest,
-        base_run_id=args.base_run_id,
+        production_run_id=args.production_run_id,
     )
     if args.github_output:
         write_github_output(run_ids, args.github_output)

@@ -3,18 +3,8 @@ name: Deploy Production
 on:
   workflow_dispatch:
     inputs:
-      image_manifest:
-        description: Optional complete digest-pinned image refs JSON. Use for recovery/manual deploy only.
-        required: false
-        default: ""
-        type: string
-      base_image_manifest:
-        description: Optional complete base digest manifest JSON used before applying artifact updates.
-        required: false
-        default: ""
-        type: string
-      base_deploy_run_id:
-        description: Optional prior Deploy Production run ID with production-image-manifest artifact.
+      production_manifest_run_id:
+        description: Optional prior Deploy Production run ID with production-image-manifest artifact containing digest-pinned image refs. Alone, redeploys that exact manifest.
         required: false
         default: ""
         type: string
@@ -83,30 +73,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           APP_MANIFEST_RUN_ID: ${{ inputs.app_manifest_run_id }}
-          BASE_DEPLOY_RUN_ID: ${{ inputs.base_deploy_run_id }}
-          BASE_IMAGE_MANIFEST: ${{ inputs.base_image_manifest }}
-          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
           INFRA_MANIFEST_RUN_ID: ${{ inputs.infra_manifest_run_id }}
+          PRODUCTION_MANIFEST_RUN_ID: ${{ inputs.production_manifest_run_id }}
           SERVICES_MANIFEST_RUN_ID: ${{ inputs.services_manifest_run_id }}
         run: |
           uv run --no-project --python 3.12 python -m scripts.images.artifacts \
-            --manual-manifest "$IMAGE_MANIFEST" \
-            --base-manifest "$BASE_IMAGE_MANIFEST" \
-            --base-run-id "$BASE_DEPLOY_RUN_ID" \
+            --production-run-id "$PRODUCTION_MANIFEST_RUN_ID" \
             --app-run-id "$APP_MANIFEST_RUN_ID" \
             --infra-run-id "$INFRA_MANIFEST_RUN_ID" \
             --services-run-id "$SERVICES_MANIFEST_RUN_ID" \
             --github-output "$GITHUB_OUTPUT"
 
-      - name: Download base deployment manifest
-        if: ${{ inputs.base_deploy_run_id != '' }}
+      - name: Download production image manifest
+        if: ${{ inputs.production_manifest_run_id != '' }}
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: production-image-manifest
           path: image-manifests/base
           github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.base_deploy_run_id }}
+          run-id: ${{ inputs.production_manifest_run_id }}
 
       - name: Download app image manifest
         if: ${{ steps.artifacts.outputs.app_manifest_run_id != '' }}
@@ -138,15 +124,10 @@ jobs:
           repository: ${{ github.repository_owner }}/vn-news-services
           run-id: ${{ steps.artifacts.outputs.services_manifest_run_id }}
 
-      - name: Promote image manifest
+      - name: Assemble production image manifest
         id: manifest
-        env:
-          BASE_IMAGE_MANIFEST: ${{ inputs.base_image_manifest }}
-          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
         run: |
           uv run --no-project --python 3.12 python -m scripts.images.promote \
-            --manual "$IMAGE_MANIFEST" \
-            --base "$BASE_IMAGE_MANIFEST" \
             --base-file image-manifests/base/image-manifest.json \
             --manifest-dir image-manifests/updates \
             --output image-manifest.json \

@@ -28,7 +28,7 @@ def test_resolve_manifest_run_ids_discovers_missing_ids(monkeypatch: pytest.Monk
     assert calls == ["vn-news-infra", "vn-news-services"]
 
 
-def test_resolve_manifest_run_ids_does_not_discover_for_base_promotion(
+def test_resolve_manifest_run_ids_does_not_discover_for_production_manifest_base(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -44,8 +44,28 @@ def test_resolve_manifest_run_ids_does_not_discover_for_base_promotion(
         artifact_name="image-manifest",
         token="token",
         provided_run_ids={"app": "", "infra": "", "services": "456"},
-        base_run_id="789",
+        production_run_id="789",
     ) == {"app": "", "infra": "", "services": "456"}
+
+
+def test_resolve_manifest_run_ids_does_not_discover_for_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        artifacts,
+        "latest_artifact_run_id",
+        lambda **_kwargs: pytest.fail("rollback must reuse the production manifest only"),
+    )
+
+    assert artifacts.resolve_manifest_run_ids(
+        owner="owner",
+        branch="main",
+        workflow_name="Publish Images",
+        artifact_name="image-manifest",
+        token="token",
+        provided_run_ids={"app": "", "infra": "", "services": ""},
+        production_run_id="789",
+    ) == {"app": "", "infra": "", "services": ""}
 
 
 def test_run_has_artifact_ignores_expired_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,30 +87,3 @@ def test_run_has_artifact_ignores_expired_artifacts(monkeypatch: pytest.MonkeyPa
         artifact_name="image-manifest",
         token="token",
     )
-
-
-def test_resolve_manifest_run_ids_rejects_manual_with_artifacts() -> None:
-    with pytest.raises(ValueError, match="manual image_manifest"):
-        artifacts.resolve_manifest_run_ids(
-            owner="owner",
-            branch="main",
-            workflow_name="Publish Images",
-            artifact_name="image-manifest",
-            token="token",
-            provided_run_ids={"app": "123", "infra": "", "services": ""},
-            manual_manifest='{"app":"ref"}',
-        )
-
-
-def test_resolve_manifest_run_ids_rejects_duplicate_base_sources() -> None:
-    with pytest.raises(ValueError, match="one base manifest source"):
-        artifacts.resolve_manifest_run_ids(
-            owner="owner",
-            branch="main",
-            workflow_name="Publish Images",
-            artifact_name="image-manifest",
-            token="token",
-            provided_run_ids={"app": "", "infra": "", "services": ""},
-            base_manifest='{"app":"ref"}',
-            base_run_id="456",
-        )
