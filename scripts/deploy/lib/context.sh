@@ -121,7 +121,6 @@ cleanup_image_env() {
 
   image_env_names_tmp="$(mktemp)"
   run_cicd_module scripts.images.manifest \
-    --manifest "$image_manifest" \
     --format cleanup-env-names >"$image_env_names_tmp"
   while IFS= read -r key; do
     [[ -n "$key" ]] || continue

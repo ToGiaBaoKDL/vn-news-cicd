@@ -16,13 +16,6 @@ from scripts.images.catalog import (
 )
 
 DIGEST_REF_PATTERN = re.compile(r"^.+@sha256:[a-f0-9]{64}$")
-DEPRECATED_IMAGE_ENV_NAMES = (
-    "VN_NEWS_APP_IMAGE_TAG",
-    "VN_NEWS_INFRA_IMAGE_TAG",
-    "VN_NEWS_SERVICES_IMAGE_TAG",
-    "VN_NEWS_IMAGE_REGISTRY",
-    "VN_NEWS_IMAGE_NAMESPACE",
-)
 
 
 def parse_json_manifest(manifest: str) -> dict[str, str]:
@@ -91,18 +84,8 @@ def shell_exports(catalog: dict, image_refs: dict[str, str], role: str | None = 
     return "".join(f"export {key}={shlex.quote(value)}\n" for key, value in sorted(values.items()))
 
 
-def image_env_names(catalog: dict) -> str:
-    names = sorted(image_env(catalog, image_key) for image_key in catalog["images"])
-    return "".join(f"{name}\n" for name in names)
-
-
 def cleanup_env_names(catalog: dict) -> str:
-    names = sorted(
-        {
-            *DEPRECATED_IMAGE_ENV_NAMES,
-            *(image_env(catalog, key) for key in catalog["images"]),
-        }
-    )
+    names = sorted(image_env(catalog, key) for key in catalog["images"])
     return "".join(f"{name}\n" for name in names)
 
 
@@ -112,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", default=os.environ.get("VN_NEWS_IMAGE_MANIFEST", ""))
     parser.add_argument(
         "--format",
-        choices=("json", "shell", "env-names", "cleanup-env-names"),
+        choices=("json", "shell", "cleanup-env-names"),
         default="json",
     )
     parser.add_argument("--role", choices=("data", "control", "processing"))
@@ -122,9 +105,6 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     catalog = load_image_catalog(args.catalog)
-    if args.format == "env-names":
-        print(image_env_names(catalog), end="")
-        return
     if args.format == "cleanup-env-names":
         print(cleanup_env_names(catalog), end="")
         return

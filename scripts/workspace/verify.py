@@ -6,7 +6,6 @@ from pathlib import Path
 import yaml
 from news_platform.config import load_settings, load_sources
 
-from scripts.images.manifest import DEPRECATED_IMAGE_ENV_NAMES
 from scripts.paths import CICD_ROOT, WORKSPACE_ROOT
 
 APP_ROOT = WORKSPACE_ROOT / "vn-news-app"
@@ -49,7 +48,7 @@ REQUIRED_SCRIPT_MODULES = (
     "scripts/images/digests.py",
     "scripts/images/imagetools.py",
     "scripts/images/manifest.py",
-    "scripts/images/merge.py",
+    "scripts/images/promote.py",
     "scripts/images/tags.py",
     "scripts/images/verify.py",
     "scripts/services/airflow/validate_dag.py",
@@ -128,18 +127,16 @@ def validate_deployment_identity_usage() -> None:
         if not path.is_file():
             continue
         content = path.read_text(encoding="utf-8")
-        for variable in DEPRECATED_IMAGE_ENV_NAMES:
-            if variable in content:
-                relative_path = path.relative_to(WORKSPACE_ROOT)
-                raise ValueError(f"{relative_path} must use full per-image refs, not {variable}")
+        if "_IMAGE_TAG" in content:
+            relative_path = path.relative_to(WORKSPACE_ROOT)
+            raise ValueError(f"{relative_path} must use full per-image refs, not image tags")
     for relative_path in (
         "scripts/deploy/production.sh",
         ".github/workflows/deploy-production.yaml",
     ):
         content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
-        for variable in DEPRECATED_IMAGE_ENV_NAMES:
-            if variable in content:
-                raise ValueError(f"{relative_path} must not use stale image variable {variable}")
+        if "inputs.image_tag" in content or "--image-tag" in content:
+            raise ValueError(f"{relative_path} must use image manifests, not image tags")
 
     deploy_workflow = (CICD_ROOT / ".github" / "workflows" / "deploy-production.yaml").read_text(
         encoding="utf-8"
@@ -150,10 +147,18 @@ def validate_deployment_identity_usage() -> None:
         raise ValueError("deploy workflow must not build images")
     if "python -m scripts.images.verify" not in deploy_workflow:
         raise ValueError("deploy workflow must verify deployment images")
-    if "--image-tag" in deploy_workflow or "inputs.image_tag" in deploy_workflow:
-        raise ValueError("deploy workflow must use image_manifest, not a global image tag")
     if "digest-pinned image refs" not in deploy_workflow.lower():
         raise ValueError("deploy workflow must document digest-pinned image manifests")
+    for fragment in (
+        "actions/download-artifact@",
+        "actions/upload-artifact@",
+        "python -m scripts.images.promote",
+        "production-image-manifest",
+        "image-manifests/updates",
+        "steps.manifest.outputs.image_manifest",
+    ):
+        if fragment not in deploy_workflow:
+            raise ValueError(f"deploy workflow missing promotion fragment: {fragment}")
 
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
@@ -164,7 +169,7 @@ def validate_deployment_identity_usage() -> None:
         "cleanup_image_env" not in deploy_context
         or "--format cleanup-env-names" not in deploy_context
     ):
-        raise ValueError("deployment context must remove stale image env before deploy")
+        raise ValueError("deployment context must refresh image env before deploy")
     if "set_role_env_value" not in deploy_context:
         raise ValueError("deployment context must persist rendered image env")
     if "write_deployment_metadata" not in deploy_context:
@@ -308,6 +313,8 @@ def validate_source_image_workflow(owner: str, root: Path) -> None:
         "python -m scripts.images.changed",
         "python -m scripts.images.build",
         "python -m scripts.images.digests",
+        "actions/upload-artifact@",
+        "image-manifest/image-manifest.json",
         f"--catalog ../{owner}/images.yaml",
         "--workspace-root ..",
         "--push",
@@ -319,8 +326,6 @@ def validate_source_image_workflow(owner: str, root: Path) -> None:
             raise ValueError(f"{workflow_path} missing image publish fragment: {fragment}")
     if owner in {"vn-news-app", "vn-news-services"} and "platform_lib_ref" not in workflow:
         raise ValueError(f"{workflow_path} must include platform_lib_ref input")
-    if "VN_NEWS_ENABLE_IMAGE_PUBLISH" in workflow:
-        raise ValueError(f"{workflow_path} must publish directly on image-relevant pushes")
 
 
 def validate_image_build(image_key: str, build: dict) -> None:
@@ -362,7 +367,12 @@ def validate_role_env_templates() -> None:
     for role, env in env_by_role.items():
         if "VN_NEWS_IMAGE_MANIFEST" not in env:
             raise ValueError(f"{role} env is missing VN_NEWS_IMAGE_MANIFEST")
-        stale = sorted(set(env) & set(DEPRECATED_IMAGE_ENV_NAMES))
+        stale = sorted(
+            key
+            for key in env
+            if key.endswith("_IMAGE_TAG")
+            or key in {"VN_NEWS_IMAGE_REGISTRY", "VN_NEWS_IMAGE_NAMESPACE"}
+        )
         if stale:
             raise ValueError(f"{role} env has stale image variables: {stale}")
         missing_image_env = sorted(required_image_env_by_role[role] - set(env))

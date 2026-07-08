@@ -4,8 +4,34 @@ on:
   workflow_dispatch:
     inputs:
       image_manifest:
-        description: Digest-pinned image refs as compact JSON keyed by image name.
-        required: true
+        description: Optional complete digest-pinned image refs JSON. Use for recovery/manual deploy only.
+        required: false
+        default: ""
+        type: string
+      base_image_manifest:
+        description: Optional complete base digest manifest JSON used before applying artifact updates.
+        required: false
+        default: ""
+        type: string
+      base_deploy_run_id:
+        description: Optional prior Deploy Production run ID with production-image-manifest artifact.
+        required: false
+        default: ""
+        type: string
+      app_manifest_run_id:
+        description: Optional vn-news-app Publish Images run ID with image-manifest artifact.
+        required: false
+        default: ""
+        type: string
+      infra_manifest_run_id:
+        description: Optional vn-news-infra Publish Images run ID with image-manifest artifact.
+        required: false
+        default: ""
+        type: string
+      services_manifest_run_id:
+        description: Optional vn-news-services Publish Images run ID with image-manifest artifact.
+        required: false
+        default: ""
         type: string
       default_ref:
         description: Default ref for all repositories.
@@ -19,6 +45,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -51,12 +78,66 @@ jobs:
           version: "0.11.17"
           python-version: "3.12"
 
+      - name: Download base deployment manifest
+        if: ${{ inputs.base_deploy_run_id != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: production-image-manifest
+          path: image-manifests/base
+          github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.base_deploy_run_id }}
+
+      - name: Download app image manifest
+        if: ${{ inputs.app_manifest_run_id != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-manifest
+          path: image-manifests/updates/vn-news-app
+          github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          repository: ${{ github.repository_owner }}/vn-news-app
+          run-id: ${{ inputs.app_manifest_run_id }}
+
+      - name: Download infra image manifest
+        if: ${{ inputs.infra_manifest_run_id != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-manifest
+          path: image-manifests/updates/vn-news-infra
+          github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          repository: ${{ github.repository_owner }}/vn-news-infra
+          run-id: ${{ inputs.infra_manifest_run_id }}
+
+      - name: Download services image manifest
+        if: ${{ inputs.services_manifest_run_id != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-manifest
+          path: image-manifests/updates/vn-news-services
+          github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          repository: ${{ github.repository_owner }}/vn-news-services
+          run-id: ${{ inputs.services_manifest_run_id }}
+
+      - name: Promote image manifest
+        id: manifest
+        env:
+          BASE_IMAGE_MANIFEST: ${{ inputs.base_image_manifest }}
+          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
+        run: |
+          uv run --no-project --python 3.12 python -m scripts.images.promote \
+            --manual "$IMAGE_MANIFEST" \
+            --base "$BASE_IMAGE_MANIFEST" \
+            --base-file image-manifests/base/image-manifest.json \
+            --manifest-dir image-manifests/updates \
+            --output image-manifest.json \
+            --github-output "$GITHUB_OUTPUT"
+
       - name: Resolve deployment refs
         id: refs
         env:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           DEFAULT_REF: ${{ inputs.default_ref }}
-          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
+          IMAGE_MANIFEST: ${{ steps.manifest.outputs.image_manifest }}
           REPO_REFS: ${{ inputs.repo_refs }}
         run: |
           uv run --no-project --python 3.12 python -m scripts.deploy.refs \
@@ -299,3 +380,21 @@ jobs:
             --cicd-ref "$CICD_REF" \
             --platform-lib-ref "$PLATFORM_LIB_REF" \
             < scripts/deploy/production.sh
+
+  archive-deployment:
+    needs: [plan, deploy-processing]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write production image manifest
+        env:
+          IMAGE_MANIFEST: ${{ needs.plan.outputs.image_manifest }}
+        run: printf '%s\n' "$IMAGE_MANIFEST" > image-manifest.json
+
+      - name: Upload production image manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-image-manifest
+          path: image-manifest.json
+          if-no-files-found: error
+          retention-days: 90
