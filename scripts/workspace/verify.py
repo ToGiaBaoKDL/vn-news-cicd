@@ -42,6 +42,7 @@ IMMUTABLE_ACTION_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 REQUIRED_SCRIPT_MODULES = (
     "scripts/deploy/refs.py",
+    "scripts/images/artifacts.py",
     "scripts/images/build.py",
     "scripts/images/catalog.py",
     "scripts/images/changed.py",
@@ -152,9 +153,13 @@ def validate_deployment_identity_usage() -> None:
     for fragment in (
         "actions/download-artifact@",
         "actions/upload-artifact@",
+        "python -m scripts.images.artifacts",
         "python -m scripts.images.promote",
         "production-image-manifest",
         "image-manifests/updates",
+        "steps.artifacts.outputs.app_manifest_run_id",
+        "steps.artifacts.outputs.infra_manifest_run_id",
+        "steps.artifacts.outputs.services_manifest_run_id",
         "steps.manifest.outputs.image_manifest",
     ):
         if fragment not in deploy_workflow:
@@ -301,6 +306,8 @@ def validate_change_paths(catalog_path: Path, scope: str, change_paths: object) 
     invalid = [path for path in change_paths if not isinstance(path, str) or not path.strip()]
     if invalid:
         raise ValueError(f"{catalog_path} {scope} has invalid change_paths: {invalid}")
+    if ".github/workflows/publish-images.yaml" in change_paths:
+        raise ValueError(f"{catalog_path} {scope} must not rebuild images for workflow-only edits")
 
 
 def validate_source_image_workflow(owner: str, root: Path) -> None:

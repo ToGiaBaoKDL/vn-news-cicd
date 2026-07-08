@@ -48,3 +48,15 @@ def test_selected_images_can_build_all() -> None:
     }
 
     assert selected_images(catalog, (), build_all=True) == ("api", "web")
+
+
+def test_selected_images_ignores_workflow_only_change() -> None:
+    catalog = {
+        "change_paths": ["images.yaml"],
+        "images": {
+            "web": {"change_paths": ["web/**"]},
+            "api": {"change_paths": ["api/**"]},
+        },
+    }
+
+    assert selected_images(catalog, (".github/workflows/publish-images.yaml",)) == ()

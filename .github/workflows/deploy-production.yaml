@@ -78,6 +78,26 @@ jobs:
           version: "0.11.17"
           python-version: "3.12"
 
+      - name: Resolve image manifest artifact runs
+        id: artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
+          APP_MANIFEST_RUN_ID: ${{ inputs.app_manifest_run_id }}
+          BASE_DEPLOY_RUN_ID: ${{ inputs.base_deploy_run_id }}
+          BASE_IMAGE_MANIFEST: ${{ inputs.base_image_manifest }}
+          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
+          INFRA_MANIFEST_RUN_ID: ${{ inputs.infra_manifest_run_id }}
+          SERVICES_MANIFEST_RUN_ID: ${{ inputs.services_manifest_run_id }}
+        run: |
+          uv run --no-project --python 3.12 python -m scripts.images.artifacts \
+            --manual-manifest "$IMAGE_MANIFEST" \
+            --base-manifest "$BASE_IMAGE_MANIFEST" \
+            --base-run-id "$BASE_DEPLOY_RUN_ID" \
+            --app-run-id "$APP_MANIFEST_RUN_ID" \
+            --infra-run-id "$INFRA_MANIFEST_RUN_ID" \
+            --services-run-id "$SERVICES_MANIFEST_RUN_ID" \
+            --github-output "$GITHUB_OUTPUT"
+
       - name: Download base deployment manifest
         if: ${{ inputs.base_deploy_run_id != '' }}
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
@@ -89,34 +109,34 @@ jobs:
           run-id: ${{ inputs.base_deploy_run_id }}
 
       - name: Download app image manifest
-        if: ${{ inputs.app_manifest_run_id != '' }}
+        if: ${{ steps.artifacts.outputs.app_manifest_run_id != '' }}
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: image-manifest
           path: image-manifests/updates/vn-news-app
           github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           repository: ${{ github.repository_owner }}/vn-news-app
-          run-id: ${{ inputs.app_manifest_run_id }}
+          run-id: ${{ steps.artifacts.outputs.app_manifest_run_id }}
 
       - name: Download infra image manifest
-        if: ${{ inputs.infra_manifest_run_id != '' }}
+        if: ${{ steps.artifacts.outputs.infra_manifest_run_id != '' }}
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: image-manifest
           path: image-manifests/updates/vn-news-infra
           github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           repository: ${{ github.repository_owner }}/vn-news-infra
-          run-id: ${{ inputs.infra_manifest_run_id }}
+          run-id: ${{ steps.artifacts.outputs.infra_manifest_run_id }}
 
       - name: Download services image manifest
-        if: ${{ inputs.services_manifest_run_id != '' }}
+        if: ${{ steps.artifacts.outputs.services_manifest_run_id != '' }}
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: image-manifest
           path: image-manifests/updates/vn-news-services
           github-token: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           repository: ${{ github.repository_owner }}/vn-news-services
-          run-id: ${{ inputs.services_manifest_run_id }}
+          run-id: ${{ steps.artifacts.outputs.services_manifest_run_id }}
 
       - name: Promote image manifest
         id: manifest
