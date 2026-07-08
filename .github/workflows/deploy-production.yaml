@@ -80,7 +80,7 @@ jobs:
 
       - name: Download base deployment manifest
         if: ${{ inputs.base_deploy_run_id != '' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: production-image-manifest
           path: image-manifests/base
@@ -90,7 +90,7 @@ jobs:
 
       - name: Download app image manifest
         if: ${{ inputs.app_manifest_run_id != '' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: image-manifest
           path: image-manifests/updates/vn-news-app
@@ -100,7 +100,7 @@ jobs:
 
       - name: Download infra image manifest
         if: ${{ inputs.infra_manifest_run_id != '' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: image-manifest
           path: image-manifests/updates/vn-news-infra
@@ -110,7 +110,7 @@ jobs:
 
       - name: Download services image manifest
         if: ${{ inputs.services_manifest_run_id != '' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: image-manifest
           path: image-manifests/updates/vn-news-services
@@ -392,7 +392,7 @@ jobs:
         run: printf '%s\n' "$IMAGE_MANIFEST" > image-manifest.json
 
       - name: Upload production image manifest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: production-image-manifest
           path: image-manifest.json
