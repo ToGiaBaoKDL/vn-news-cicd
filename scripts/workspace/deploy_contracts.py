@@ -78,6 +78,17 @@ def validate_deploy_context() -> None:
         or "--format cleanup-env-names" not in deploy_context
     ):
         raise ValueError("deployment context must refresh image env before deploy")
+    for legacy_key in (
+        "VN_NEWS_IMAGE_TAG",
+        "VN_NEWS_IMAGE_REGISTRY",
+        "VN_NEWS_IMAGE_NAMESPACE",
+        "VN_NEWS_APP_IMAGE_TAG",
+        "VN_NEWS_DEPLOY_IMAGE_TAG",
+        "VN_NEWS_INFRA_IMAGE_TAG",
+        "VN_NEWS_SERVICES_IMAGE_TAG",
+    ):
+        if legacy_key not in deploy_context:
+            raise ValueError(f"deployment context must remove legacy image env: {legacy_key}")
     if "set_role_env_value" not in deploy_context:
         raise ValueError("deployment context must persist rendered image env")
     if "write_deployment_metadata" not in deploy_context:

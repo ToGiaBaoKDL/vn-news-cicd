@@ -14,6 +14,15 @@ infra_root="$repos_root/vn-news-infra"
 cicd_root="$repos_root/vn-news-cicd"
 env_file="${VN_NEWS_ENV_FILE:-/etc/vn-news/env/${role}.env}"
 deployment_metadata_file="${VN_NEWS_DEPLOYMENT_METADATA_FILE:-/etc/vn-news/deployment.json}"
+legacy_image_env_keys=(
+  VN_NEWS_IMAGE_TAG
+  VN_NEWS_IMAGE_REGISTRY
+  VN_NEWS_IMAGE_NAMESPACE
+  VN_NEWS_APP_IMAGE_TAG
+  VN_NEWS_DEPLOY_IMAGE_TAG
+  VN_NEWS_INFRA_IMAGE_TAG
+  VN_NEWS_SERVICES_IMAGE_TAG
+)
 
 checkout_repo() {
   local repo_name="$1"
@@ -119,6 +128,7 @@ remove_role_env_value() {
 cleanup_image_env() {
   local image_env_names_tmp key
 
+  cleanup_legacy_image_env
   image_env_names_tmp="$(mktemp)"
   run_cicd_module scripts.images.manifest \
     --format cleanup-env-names >"$image_env_names_tmp"
@@ -127,6 +137,14 @@ cleanup_image_env() {
     remove_role_env_value "$key"
   done <"$image_env_names_tmp"
   rm -f "$image_env_names_tmp"
+}
+
+cleanup_legacy_image_env() {
+  local key
+
+  for key in "${legacy_image_env_keys[@]}"; do
+    remove_role_env_value "$key"
+  done
 }
 
 prepare_deploy_context() {

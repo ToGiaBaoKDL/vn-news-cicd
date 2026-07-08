@@ -22,6 +22,19 @@ def test_deploy_context_shell_quotes_persisted_env_values() -> None:
     assert "printf '%s=%q\\n'" in deploy_context
 
 
+def test_deploy_context_cleans_legacy_image_env() -> None:
+    deploy_context = Path("scripts/deploy/lib/context.sh").read_text(encoding="utf-8")
+
+    assert "cleanup_legacy_image_env" in deploy_context
+    assert "VN_NEWS_IMAGE_TAG" in deploy_context
+    assert "VN_NEWS_IMAGE_REGISTRY" in deploy_context
+    assert "VN_NEWS_IMAGE_NAMESPACE" in deploy_context
+    assert "VN_NEWS_APP_IMAGE_TAG" in deploy_context
+    assert "VN_NEWS_DEPLOY_IMAGE_TAG" in deploy_context
+    assert "VN_NEWS_INFRA_IMAGE_TAG" in deploy_context
+    assert "VN_NEWS_SERVICES_IMAGE_TAG" in deploy_context
+
+
 def test_airflow_dag_validation_handles_prefixed_logs() -> None:
     output = 'loading config\n[{"dag_id":"vn_news_hourly_ingestion"}]\n'
 
