@@ -7,10 +7,8 @@ import pytest
 import yaml
 from news_platform.config import load_settings
 from news_platform.ids import make_run_id, normalize_article_url
-from scripts.workspace.verify import (
-    validate_deployment_identity_usage,
-    validate_workflow_action_ref,
-)
+from scripts.workspace.deploy_contracts import validate_deployment_identity_usage
+from scripts.workspace.workflow_contracts import validate_workflow_action_ref
 
 
 def test_bucket_suffixes_are_unique() -> None:
