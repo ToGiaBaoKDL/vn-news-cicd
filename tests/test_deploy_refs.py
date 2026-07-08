@@ -46,6 +46,11 @@ def test_image_tag_from_manifest_accepts_text_manifest() -> None:
     )
 
 
+def test_image_manifest_rejects_bare_tag() -> None:
+    with pytest.raises(ValueError, match="Invalid image_manifest entry"):
+        refs.image_tag_from_manifest("", "bundle-ed750e7c6400d6f3")
+
+
 def test_resolve_deploy_refs_uses_explicit_image_tag(monkeypatch: pytest.MonkeyPatch) -> None:
     commits = {
         repo_name: f"{index:040x}" for index, repo_name in enumerate(refs.REPOSITORIES, start=1)

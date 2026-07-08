@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from scripts.services.polaris.config import (
-    LEGACY_RUNTIME_CATALOG_ROLE_NAMES,
     RUNTIME_ENTITY_PROPERTIES,
     PolarisCredentials,
     PolarisDeployConfig,
@@ -48,10 +46,6 @@ class PolarisCli:
             capture_output=capture_output,
             text=True,
         )
-
-    def run_json(self, *args: str) -> dict:
-        result = self.run(*args, capture_output=True)
-        return json.loads(result.stdout)
 
     def resource_exists(self, *args: str) -> bool:
         result = self.run(*args, check=False, capture_output=True)
@@ -102,48 +96,6 @@ class PolarisCli:
         )
         print(f"rotated Polaris runtime credentials: {config.runtime_principal_name}")
         return credentials_from_cli_payload(result.stdout, self.credentials.realm)
-
-    def cleanup_legacy_catalog_roles(self, config: PolarisDeployConfig) -> None:
-        for role_name in LEGACY_RUNTIME_CATALOG_ROLE_NAMES:
-            if not self.resource_exists(
-                "catalog-roles",
-                "get",
-                "--catalog",
-                config.catalog_name,
-                role_name,
-            ):
-                continue
-
-            role = self.run_json(
-                "catalog-roles",
-                "get",
-                "--catalog",
-                config.catalog_name,
-                role_name,
-            )
-            role_payload = role.get("catalogRole", role) if isinstance(role, dict) else {}
-            properties = (
-                role_payload.get("properties", {}) if isinstance(role_payload, dict) else {}
-            )
-            if properties.get("managed-by") != RUNTIME_ENTITY_PROPERTIES["managed-by"]:
-                raise RuntimeError(
-                    "Refusing to delete unmanaged legacy Polaris catalog role: "
-                    f"{config.catalog_name}/{role_name}"
-                )
-
-            self.run(
-                "catalog-roles",
-                "revoke",
-                "--catalog",
-                config.catalog_name,
-                "--principal-role",
-                config.runtime_principal_role_name,
-                role_name,
-                check=False,
-                capture_output=True,
-            )
-            self.run("catalog-roles", "delete", "--catalog", config.catalog_name, role_name)
-            print(f"removed legacy Polaris catalog role: {config.catalog_name}/{role_name}")
 
 
 def runtime_cli(config: PolarisDeployConfig, credentials: PolarisCredentials) -> PolarisCli:

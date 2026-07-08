@@ -21,7 +21,6 @@ DEFAULT_STORAGE_REGION = "us-east-1"
 DEFAULT_RUNTIME_CATALOG_ROLE_NAME = "vn-news-spark-runtime-writer"
 DEFAULT_RUNTIME_PRINCIPAL_NAME = "vn-news-spark-runtime"
 DEFAULT_RUNTIME_PRINCIPAL_ROLE_NAME = "vn-news-spark-runtime"
-LEGACY_RUNTIME_CATALOG_ROLE_NAMES = ("vn-news-curated-writer",)
 PENDING_RUNTIME_CREDENTIALS_STATUS = "pending-polaris-runtime-principal"
 RUNTIME_ENTITY_PROPERTIES = {
     "managed-by": "vn-news-cicd",

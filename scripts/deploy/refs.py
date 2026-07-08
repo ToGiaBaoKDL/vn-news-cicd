@@ -150,9 +150,6 @@ def parse_text_manifest_image_tag(manifest: str) -> str:
         for entry in chunk.split(",")
         if entry.strip()
     ]
-    if len(entries) == 1 and "=" not in entries[0] and ":" not in entries[0]:
-        return entries[0]
-
     values: dict[str, str] = {}
     for entry in entries:
         if "=" in entry:

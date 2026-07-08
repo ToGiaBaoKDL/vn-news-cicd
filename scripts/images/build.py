@@ -11,7 +11,6 @@ from scripts.paths import WORKSPACE_ROOT
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build images declared in images.yaml.")
-    parser.add_argument("--github-actions-cache", action="store_true")
     parser.add_argument("--image", action="append", dest="images")
     parser.add_argument("--tag", required=True)
     parser.add_argument("--push", action="store_true")
@@ -24,7 +23,6 @@ def image_command(
     image_key: str,
     tag: str,
     push: bool,
-    github_actions_cache: bool = False,
 ) -> list[str]:
     image = catalog["images"][image_key]
     build = image["build"]
@@ -41,16 +39,6 @@ def image_command(
     platforms = catalog.get("platforms", [])
     if push and platforms:
         command.extend(["--platform", ",".join(platforms)])
-    if github_actions_cache:
-        cache_scope = f"vn-news-{image_key}"
-        command.extend(
-            [
-                "--cache-from",
-                f"type=gha,scope={cache_scope}",
-                "--cache-to",
-                f"type=gha,mode=max,scope={cache_scope}",
-            ]
-        )
     for name, path in sorted(build.get("additional_contexts", {}).items()):
         command.extend(["--build-context", f"{name}={WORKSPACE_ROOT / path}"])
     command.append("--push" if push else "--load")
@@ -74,7 +62,6 @@ def main() -> None:
             image_key,
             args.tag,
             args.push,
-            args.github_actions_cache,
         )
         print(shlex.join(command))
         if not args.dry_run:

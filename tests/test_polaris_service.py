@@ -221,7 +221,6 @@ def test_provision_updates_vault_when_runtime_secret_is_pending(
         "setup_apply",
         lambda self, path, dry_run=False: applied_setup_files.append(Path(path)),
     )
-    monkeypatch.setattr(PolarisCli, "cleanup_legacy_catalog_roles", lambda self, config: None)
 
     args = argparse.Namespace(
         credentials_file=credentials_file,

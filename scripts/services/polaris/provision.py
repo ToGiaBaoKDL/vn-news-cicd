@@ -89,11 +89,6 @@ def provision(args: argparse.Namespace) -> None:
         write_setup_config(setup_path, render_runtime_setup_config(config))
         cli.setup_apply(setup_path, dry_run=args.dry_run)
 
-    if args.dry_run:
-        print("would remove managed legacy Polaris catalog roles")
-    else:
-        cli.cleanup_legacy_catalog_roles(config)
-
     if new_credentials is not None:
         maybe_update_runtime_secret(
             args,
