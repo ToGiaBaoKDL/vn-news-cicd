@@ -198,9 +198,10 @@ jobs:
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
           PLATFORM_LIB_REF: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
         run: |
+          image_manifest_arg="$(printf '%q' "$IMAGE_MANIFEST")"
           ssh "$USER@$HOST" bash -s -- \
             --role data \
-            --image-manifest "$IMAGE_MANIFEST" \
+            --image-manifest "$image_manifest_arg" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
@@ -243,9 +244,10 @@ jobs:
           APP_REF: ${{ needs.plan.outputs.vn_news_app_ref }}
           PIPELINES_REF: ${{ needs.plan.outputs.vn_news_pipelines_ref }}
         run: |
+          image_manifest_arg="$(printf '%q' "$IMAGE_MANIFEST")"
           ssh "$USER@$HOST" bash -s -- \
             --role control \
-            --image-manifest "$IMAGE_MANIFEST" \
+            --image-manifest "$image_manifest_arg" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
@@ -288,9 +290,10 @@ jobs:
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
           PLATFORM_LIB_REF: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
         run: |
+          image_manifest_arg="$(printf '%q' "$IMAGE_MANIFEST")"
           ssh "$USER@$HOST" bash -s -- \
             --role processing \
-            --image-manifest "$IMAGE_MANIFEST" \
+            --image-manifest "$image_manifest_arg" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \

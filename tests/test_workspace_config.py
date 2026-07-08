@@ -91,7 +91,8 @@ def test_deploy_uses_image_manifest() -> None:
         assert "RELEASE_TAG" not in deploy_step["env"]
         assert "IMAGE_TAG" not in deploy_step["env"]
         assert "--role " in deploy_step["run"]
-        assert '--image-manifest "$IMAGE_MANIFEST"' in deploy_step["run"]
+        assert 'image_manifest_arg="$(printf \'%q\' "$IMAGE_MANIFEST")"' in deploy_step["run"]
+        assert '--image-manifest "$image_manifest_arg"' in deploy_step["run"]
         assert '--platform-lib-ref "$PLATFORM_LIB_REF"' in deploy_step["run"]
 
     validate_deployment_identity_usage()
