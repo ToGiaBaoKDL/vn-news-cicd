@@ -158,7 +158,7 @@ def validate_deployment_identity_usage() -> None:
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
     )
-    if "--role \"$role\"" not in deploy_context:
+    if '--role "$role"' not in deploy_context:
         raise ValueError("deployment context must render role-scoped image env")
     if (
         "cleanup_image_env" not in deploy_context
@@ -347,8 +347,7 @@ def validate_image_build(image_key: str, build: dict) -> None:
 
 def validate_role_env_templates() -> None:
     env_by_role = {
-        role: read_env_template(INFRA_ROOT / "env" / f"{role}.env.example")
-        for role in DEPLOY_ROLES
+        role: read_env_template(INFRA_ROOT / "env" / f"{role}.env.example") for role in DEPLOY_ROLES
     }
     deploy_catalog = load_yaml(CICD_ROOT / "images.yaml")
     required_image_env_by_role = {
