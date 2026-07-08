@@ -349,12 +349,20 @@ def validate_source_image_workflow(owner: str, root: Path) -> None:
         f"--catalog ../{owner}/images.yaml",
         "--workspace-root ..",
         "--push",
+        "PUBLISH_IMAGE_TAG",
+        "Resolve publish image tag",
         "steps.images.outputs.has_changes",
         "steps.images.outputs.image_args",
     )
     for fragment in required_fragments:
         if fragment not in workflow:
             raise ValueError(f"{workflow_path} missing image publish fragment: {fragment}")
+    legacy_image_tag_patterns = (
+        re.compile(r"(?m)^\s*IMAGE_TAG:"),
+        re.compile(r"\$(?:\{)?IMAGE_TAG(?:\}|[\s\"')])"),
+    )
+    if any(pattern.search(workflow) for pattern in legacy_image_tag_patterns):
+        raise ValueError(f"{workflow_path} must use PUBLISH_IMAGE_TAG, not IMAGE_TAG")
     if owner in {"vn-news-app", "vn-news-services"} and "platform_lib_ref" not in workflow:
         raise ValueError(f"{workflow_path} must include platform_lib_ref input")
 
