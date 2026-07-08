@@ -73,14 +73,22 @@ load_image_env() {
   fi
 
   local image_env_tmp
+  cleanup_image_env
   image_env_tmp="$(mktemp)"
   run_cicd_module scripts.images.manifest \
     --manifest "$image_manifest" \
+    --role "$role" \
     --format shell >"$image_env_tmp"
   set -a
   # shellcheck disable=SC1090
   source "$image_env_tmp"
   set +a
+  while IFS= read -r line; do
+    [[ "$line" == export\ * ]] || continue
+    local assignment="${line#export }"
+    local key="${assignment%%=*}"
+    set_role_env_value "$key" "${!key}"
+  done <"$image_env_tmp"
   rm -f "$image_env_tmp"
 }
 
@@ -98,8 +106,28 @@ set_role_env_value() {
   local key="$1"
   local value="$2"
 
-  sudo sed -i "/^${key}=/d" "$env_file"
+  remove_role_env_value "$key"
   printf '%s=%q\n' "$key" "$value" | sudo tee -a "$env_file" >/dev/null
+}
+
+remove_role_env_value() {
+  local key="$1"
+
+  sudo sed -i "/^${key}=/d" "$env_file"
+}
+
+cleanup_image_env() {
+  local image_env_names_tmp key
+
+  image_env_names_tmp="$(mktemp)"
+  run_cicd_module scripts.images.manifest \
+    --manifest "$image_manifest" \
+    --format cleanup-env-names >"$image_env_names_tmp"
+  while IFS= read -r key; do
+    [[ -n "$key" ]] || continue
+    remove_role_env_value "$key"
+  done <"$image_env_names_tmp"
+  rm -f "$image_env_names_tmp"
 }
 
 prepare_deploy_context() {
@@ -111,12 +139,6 @@ prepare_deploy_context() {
   set_config_paths
   prepare_cicd_python
   load_image_env
-  set_role_env_value VN_NEWS_IMAGE_MANIFEST "$VN_NEWS_IMAGE_MANIFEST"
-  set_role_env_value VN_NEWS_IMAGE_REGISTRY "$VN_NEWS_IMAGE_REGISTRY"
-  set_role_env_value VN_NEWS_IMAGE_NAMESPACE "$VN_NEWS_IMAGE_NAMESPACE"
-  set_role_env_value VN_NEWS_APP_IMAGE_TAG "$VN_NEWS_APP_IMAGE_TAG"
-  set_role_env_value VN_NEWS_INFRA_IMAGE_TAG "$VN_NEWS_INFRA_IMAGE_TAG"
-  set_role_env_value VN_NEWS_SERVICES_IMAGE_TAG "$VN_NEWS_SERVICES_IMAGE_TAG"
   echo "deployment context: role=$role images=$VN_NEWS_IMAGE_MANIFEST"
 }
 

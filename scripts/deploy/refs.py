@@ -10,7 +10,6 @@ from scripts.images.catalog import load_image_catalog
 from scripts.images.manifest import (
     compact_image_manifest,
     parse_image_manifest,
-    validate_image_manifest_refs,
 )
 
 REPOSITORIES = (
@@ -125,14 +124,13 @@ def resolve_deploy_refs(
     ref_overrides: dict[str, str],
     image_manifest: str,
 ) -> tuple[dict[str, str], dict[str, str]]:
+    catalog = load_image_catalog()
+    image_refs = parse_image_manifest(image_manifest, catalog)
     repositories = {
         repo_name: resolve_remote_ref(owner, repo_name, ref_overrides.get(repo_name, default_ref))
         for repo_name in REPOSITORIES
     }
-    catalog = load_image_catalog()
-    image_tags = parse_image_manifest(image_manifest, catalog)
-    validate_image_manifest_refs(image_tags, catalog, repositories)
-    return image_tags, repositories
+    return image_refs, repositories
 
 
 def output_name(name: str) -> str:
@@ -140,11 +138,11 @@ def output_name(name: str) -> str:
 
 
 def write_github_output(
-    image_tags: dict[str, str],
+    image_refs: dict[str, str],
     repositories: dict[str, str],
     path: Path,
 ) -> None:
-    lines = [f"image_manifest={compact_image_manifest(image_tags)}"]
+    lines = [f"image_manifest={compact_image_manifest(image_refs)}"]
     lines.extend(
         f"{output_name(repository)}_ref={commit_ref}"
         for repository, commit_ref in sorted(repositories.items())
@@ -165,15 +163,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    image_tags, repositories = resolve_deploy_refs(
+    image_refs, repositories = resolve_deploy_refs(
         owner=args.owner,
         default_ref=args.default_ref,
         ref_overrides=parse_ref_overrides(args.ref, args.refs),
         image_manifest=args.image_manifest.strip(),
     )
     if args.github_output:
-        write_github_output(image_tags, repositories, args.github_output)
-    print(f"image_manifest={compact_image_manifest(image_tags)}")
+        write_github_output(image_refs, repositories, args.github_output)
+    print(f"image_manifest={compact_image_manifest(image_refs)}")
     for repo_name, commit_ref in sorted(repositories.items()):
         print(f"{repo_name}={commit_ref}")
 

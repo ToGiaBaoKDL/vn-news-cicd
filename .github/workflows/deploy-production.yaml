@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       image_manifest:
-        description: Published image owner tags as compact JSON.
+        description: Digest-pinned image refs as compact JSON keyed by image name.
         required: true
         type: string
       default_ref:

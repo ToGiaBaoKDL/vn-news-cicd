@@ -7,16 +7,13 @@ platforms:
 
 owners:
   vn-news-app:
-    tag_env: VN_NEWS_APP_IMAGE_TAG
     source_repositories:
       - vn-news-app
       - vn-news-platform-lib
   vn-news-infra:
-    tag_env: VN_NEWS_INFRA_IMAGE_TAG
     source_repositories:
       - vn-news-infra
   vn-news-services:
-    tag_env: VN_NEWS_SERVICES_IMAGE_TAG
     source_repositories:
       - vn-news-services
       - vn-news-platform-lib
@@ -25,31 +22,47 @@ images:
   app_api:
     owner: vn-news-app
     image_repository: vn-news-api
+    image_env: VN_NEWS_APP_API_IMAGE
+    roles: [control]
 
   app_web:
     owner: vn-news-app
     image_repository: vn-news-web
+    image_env: VN_NEWS_APP_WEB_IMAGE
+    roles: [control]
 
   infra_airflow_runtime:
     owner: vn-news-infra
     image_repository: vn-news-airflow-runtime
+    image_env: VN_NEWS_AIRFLOW_RUNTIME_IMAGE
+    roles: [control]
 
   service_feed_ingestor:
     owner: vn-news-services
     image_repository: vn-news-feed-ingestor
+    image_env: VN_NEWS_FEED_INGESTOR_IMAGE
+    roles: [control]
 
   service_article_fetcher:
     owner: vn-news-services
     image_repository: vn-news-article-fetcher
+    image_env: VN_NEWS_ARTICLE_FETCHER_IMAGE
+    roles: [processing]
 
   service_article_extractor:
     owner: vn-news-services
     image_repository: vn-news-article-extractor
+    image_env: VN_NEWS_ARTICLE_EXTRACTOR_IMAGE
+    roles: [processing]
 
   service_pipeline_metrics:
     owner: vn-news-services
     image_repository: vn-news-pipeline-metrics
+    image_env: VN_NEWS_PIPELINE_METRICS_IMAGE
+    roles: [processing]
 
   service_dlq_operator:
     owner: vn-news-services
     image_repository: vn-news-dlq-operator
+    image_env: VN_NEWS_DLQ_OPERATOR_IMAGE
+    roles: []

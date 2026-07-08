@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 from news_platform.config import load_settings, load_sources
 
+from scripts.images.manifest import DEPRECATED_IMAGE_ENV_NAMES
 from scripts.paths import CICD_ROOT, WORKSPACE_ROOT
 
 APP_ROOT = WORKSPACE_ROOT / "vn-news-app"
@@ -35,6 +36,7 @@ REPOSITORY_NAMES = (
     "vn-news-platform-lib",
     "vn-news-services",
 )
+DEPLOY_ROLES = ("data", "control", "processing")
 
 ACTION_REF_PATTERN = re.compile(r"uses:\s*([^@\s]+)@([^\s#]+)")
 IMMUTABLE_ACTION_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
@@ -43,7 +45,11 @@ REQUIRED_SCRIPT_MODULES = (
     "scripts/deploy/refs.py",
     "scripts/images/build.py",
     "scripts/images/catalog.py",
+    "scripts/images/changed.py",
+    "scripts/images/digests.py",
+    "scripts/images/imagetools.py",
     "scripts/images/manifest.py",
+    "scripts/images/merge.py",
     "scripts/images/tags.py",
     "scripts/images/verify.py",
     "scripts/services/airflow/validate_dag.py",
@@ -122,32 +128,18 @@ def validate_deployment_identity_usage() -> None:
         if not path.is_file():
             continue
         content = path.read_text(encoding="utf-8")
-        if "VN_NEWS_IMAGE_TAG" in content:
-            relative_path = path.relative_to(WORKSPACE_ROOT)
-            raise ValueError(f"{relative_path} must not use global VN_NEWS_IMAGE_TAG")
-
-    for role in ("data", "control", "processing"):
-        env_template = INFRA_ROOT / "env" / f"{role}.env.example"
-        content = env_template.read_text(encoding="utf-8")
-        required_variables = (
-            "VN_NEWS_IMAGE_MANIFEST",
-            "VN_NEWS_APP_IMAGE_TAG",
-            "VN_NEWS_INFRA_IMAGE_TAG",
-            "VN_NEWS_SERVICES_IMAGE_TAG",
-            "VN_NEWS_IMAGE_REGISTRY",
-            "VN_NEWS_IMAGE_NAMESPACE",
-        )
-        for variable in required_variables:
-            if content.count(f"{variable}=") != 1:
-                raise ValueError(f"{env_template} must define {variable} exactly once")
+        for variable in DEPRECATED_IMAGE_ENV_NAMES:
+            if variable in content:
+                relative_path = path.relative_to(WORKSPACE_ROOT)
+                raise ValueError(f"{relative_path} must use full per-image refs, not {variable}")
     for relative_path in (
         "scripts/deploy/production.sh",
-        "scripts/deploy/lib/context.sh",
         ".github/workflows/deploy-production.yaml",
     ):
         content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
-        if "VN_NEWS_IMAGE_TAG" in content:
-            raise ValueError(f"{relative_path} must not use global VN_NEWS_IMAGE_TAG")
+        for variable in DEPRECATED_IMAGE_ENV_NAMES:
+            if variable in content:
+                raise ValueError(f"{relative_path} must not use stale image variable {variable}")
 
     deploy_workflow = (CICD_ROOT / ".github" / "workflows" / "deploy-production.yaml").read_text(
         encoding="utf-8"
@@ -160,20 +152,21 @@ def validate_deployment_identity_usage() -> None:
         raise ValueError("deploy workflow must verify deployment images")
     if "--image-tag" in deploy_workflow or "inputs.image_tag" in deploy_workflow:
         raise ValueError("deploy workflow must use image_manifest, not a global image tag")
+    if "digest-pinned image refs" not in deploy_workflow.lower():
+        raise ValueError("deploy workflow must document digest-pinned image manifests")
 
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
     )
-    for variable in (
-        "VN_NEWS_IMAGE_MANIFEST",
-        "VN_NEWS_APP_IMAGE_TAG",
-        "VN_NEWS_INFRA_IMAGE_TAG",
-        "VN_NEWS_SERVICES_IMAGE_TAG",
-        "VN_NEWS_IMAGE_REGISTRY",
-        "VN_NEWS_IMAGE_NAMESPACE",
+    if "--role \"$role\"" not in deploy_context:
+        raise ValueError("deployment context must render role-scoped image env")
+    if (
+        "cleanup_image_env" not in deploy_context
+        or "--format cleanup-env-names" not in deploy_context
     ):
-        if f"set_role_env_value {variable}" not in deploy_context:
-            raise ValueError(f"deployment context must persist {variable}")
+        raise ValueError("deployment context must remove stale image env before deploy")
+    if "set_role_env_value" not in deploy_context:
+        raise ValueError("deployment context must persist rendered image env")
     if "write_deployment_metadata" not in deploy_context:
         raise ValueError("deployment context must persist deployed commit metadata")
 
@@ -215,15 +208,9 @@ def validate_image_catalog() -> None:
     owners = catalog.get("owners", {})
     if not isinstance(owners, dict) or not owners:
         raise ValueError("images.yaml must define image owners")
-    tag_envs = [owner_config.get("tag_env") for owner_config in owners.values()]
-    duplicate_tag_envs = sorted(tag_env for tag_env in set(tag_envs) if tag_envs.count(tag_env) > 1)
-    if duplicate_tag_envs:
-        raise ValueError(f"Duplicate image owner tag envs in images.yaml: {duplicate_tag_envs}")
     for owner, owner_config in sorted(owners.items()):
         if owner not in REPOSITORY_NAMES:
             raise ValueError(f"Unknown image owner repository in images.yaml: {owner}")
-        if not owner_config.get("tag_env"):
-            raise ValueError(f"Image owner {owner} is missing tag_env")
         source_repositories = owner_config.get("source_repositories")
         if not isinstance(source_repositories, list) or not source_repositories:
             raise ValueError(f"Image owner {owner} is missing source_repositories")
@@ -232,6 +219,7 @@ def validate_image_catalog() -> None:
             raise ValueError(f"Image owner {owner} has unknown sources: {unknown_sources}")
 
     repositories: list[str] = []
+    image_envs: list[str] = []
     images_by_owner: dict[str, set[str]] = {owner: set() for owner in owners}
     for image_key, image in catalog.get("images", {}).items():
         owner = image.get("owner")
@@ -244,12 +232,27 @@ def validate_image_catalog() -> None:
         if not repository:
             raise ValueError(f"Image {image_key} is missing image_repository")
         repositories.append(repository)
+        image_env = image.get("image_env")
+        if not isinstance(image_env, str) or not image_env.startswith("VN_NEWS_"):
+            raise ValueError(f"Image {image_key} is missing VN_NEWS_* image_env")
+        image_envs.append(image_env)
+        roles = image.get("roles")
+        if not isinstance(roles, list):
+            raise ValueError(f"Image {image_key} roles must be a list")
+        unknown_roles = sorted(set(roles) - set(DEPLOY_ROLES))
+        if unknown_roles:
+            raise ValueError(f"Image {image_key} has unknown deploy roles: {unknown_roles}")
 
     duplicates = sorted(
         repository for repository in set(repositories) if repositories.count(repository) > 1
     )
     if duplicates:
         raise ValueError(f"Duplicate Docker image repositories in images.yaml: {duplicates}")
+    duplicate_image_envs = sorted(
+        image_env for image_env in set(image_envs) if image_envs.count(image_env) > 1
+    )
+    if duplicate_image_envs:
+        raise ValueError(f"Duplicate image env variables in images.yaml: {duplicate_image_envs}")
 
     validate_source_image_catalogs(catalog, images_by_owner)
 
@@ -274,6 +277,7 @@ def validate_source_image_catalogs(
             raise ValueError(f"{catalog_path} version must be 1")
         if source_catalog.get("owner") != owner:
             raise ValueError(f"{catalog_path} owner must be {owner}")
+        validate_change_paths(catalog_path, "catalog", source_catalog.get("change_paths"))
         source_images = set(source_catalog.get("images", {}))
         if source_images != deploy_images_by_owner.get(owner, set()):
             raise ValueError(f"{catalog_path} images must match deployment catalog")
@@ -281,8 +285,17 @@ def validate_source_image_catalogs(
             deploy_image = deploy_catalog["images"][image_key]
             if image.get("image_repository") != deploy_image.get("image_repository"):
                 raise ValueError(f"{catalog_path} repository drift for {image_key}")
+            validate_change_paths(catalog_path, image_key, image.get("change_paths"))
             validate_image_build(image_key, image.get("build", {}))
         validate_source_image_workflow(owner, root)
+
+
+def validate_change_paths(catalog_path: Path, scope: str, change_paths: object) -> None:
+    if not isinstance(change_paths, list) or not change_paths:
+        raise ValueError(f"{catalog_path} {scope} must define change_paths")
+    invalid = [path for path in change_paths if not isinstance(path, str) or not path.strip()]
+    if invalid:
+        raise ValueError(f"{catalog_path} {scope} has invalid change_paths: {invalid}")
 
 
 def validate_source_image_workflow(owner: str, root: Path) -> None:
@@ -291,10 +304,15 @@ def validate_source_image_workflow(owner: str, root: Path) -> None:
         raise ValueError(f"{owner} must define publish-images workflow")
     workflow = workflow_path.read_text(encoding="utf-8")
     required_fragments = (
+        "fetch-depth: 0",
+        "python -m scripts.images.changed",
         "python -m scripts.images.build",
+        "python -m scripts.images.digests",
         f"--catalog ../{owner}/images.yaml",
         "--workspace-root ..",
         "--push",
+        "steps.images.outputs.has_changes",
+        "steps.images.outputs.image_args",
     )
     for fragment in required_fragments:
         if fragment not in workflow:
@@ -330,8 +348,27 @@ def validate_image_build(image_key: str, build: dict) -> None:
 def validate_role_env_templates() -> None:
     env_by_role = {
         role: read_env_template(INFRA_ROOT / "env" / f"{role}.env.example")
-        for role in ("data", "control", "processing")
+        for role in DEPLOY_ROLES
     }
+    deploy_catalog = load_yaml(CICD_ROOT / "images.yaml")
+    required_image_env_by_role = {
+        role: {
+            image["image_env"]
+            for image in deploy_catalog["images"].values()
+            if role in image.get("roles", [])
+        }
+        for role in DEPLOY_ROLES
+    }
+
+    for role, env in env_by_role.items():
+        if "VN_NEWS_IMAGE_MANIFEST" not in env:
+            raise ValueError(f"{role} env is missing VN_NEWS_IMAGE_MANIFEST")
+        stale = sorted(set(env) & set(DEPRECATED_IMAGE_ENV_NAMES))
+        if stale:
+            raise ValueError(f"{role} env has stale image variables: {stale}")
+        missing_image_env = sorted(required_image_env_by_role[role] - set(env))
+        if missing_image_env:
+            raise ValueError(f"{role} env is missing image refs: {missing_image_env}")
 
     data_env = env_by_role["data"]
     required_data = {
@@ -365,8 +402,6 @@ def validate_role_env_templates() -> None:
     processing_env = env_by_role["processing"]
     required_processing = {
         "VN_NEWS_CONFIG_HOST_DIR",
-        "VN_NEWS_IMAGE_NAMESPACE",
-        "VN_NEWS_IMAGE_REGISTRY",
         "VN_NEWS_INGESTION_S3_CREDENTIALS_SECRET_OCID",
         "VN_NEWS_PROCESSING_PRIVATE_IP",
         "VN_NEWS_REDPANDA_BOOTSTRAP_SERVERS",

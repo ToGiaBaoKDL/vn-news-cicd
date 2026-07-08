@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
-import subprocess
 
-from scripts.images.catalog import image_owner, image_reference, load_image_catalog
+from scripts.images.catalog import load_image_catalog
+from scripts.images.imagetools import inspect_raw
 from scripts.images.manifest import parse_image_manifest
 
 
@@ -19,18 +18,8 @@ def manifest_platforms(manifest: dict) -> set[str]:
     return platforms
 
 
-def inspect_image(reference: str) -> dict:
-    result = subprocess.run(
-        ["docker", "buildx", "imagetools", "inspect", "--raw", reference],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return json.loads(result.stdout)
-
-
 def verify_image(reference: str, required_platforms: set[str]) -> None:
-    published_platforms = manifest_platforms(inspect_image(reference))
+    published_platforms = manifest_platforms(inspect_raw(reference))
     missing_platforms = sorted(required_platforms - published_platforms)
     if missing_platforms:
         msg = f"{reference} is missing required platforms: {missing_platforms}"
@@ -48,7 +37,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     catalog = load_image_catalog()
-    image_tags = parse_image_manifest(args.manifest, catalog)
+    image_refs = parse_image_manifest(args.manifest, catalog)
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))
     if unknown_images:
@@ -56,10 +45,7 @@ def main() -> None:
 
     required_platforms = set(catalog["platforms"])
     for image_key in image_keys:
-        verify_image(
-            image_reference(catalog, image_key, image_tags[image_owner(catalog, image_key)]),
-            required_platforms,
-        )
+        verify_image(image_refs[image_key], required_platforms)
 
 
 if __name__ == "__main__":

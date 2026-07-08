@@ -29,7 +29,7 @@ def test_manifest_platforms_reads_image_index() -> None:
 
 def test_verify_image_rejects_missing_platform(monkeypatch) -> None:
     monkeypatch.setattr(
-        "scripts.images.verify.inspect_image",
+        "scripts.images.verify.inspect_raw",
         lambda _: {"manifests": [{"platform": {"os": "linux", "architecture": "amd64"}}]},
     )
 

@@ -3,18 +3,26 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 from json import JSONDecodeError
 from pathlib import Path
 
 from scripts.images.catalog import (
-    catalog_value,
-    image_owners,
+    image_env,
+    image_repository_ref,
+    image_roles,
     load_image_catalog,
-    owner_source_repositories,
-    owner_tag_env,
 )
-from scripts.images.tags import validate_tag
+
+DIGEST_REF_PATTERN = re.compile(r"^.+@sha256:[a-f0-9]{64}$")
+DEPRECATED_IMAGE_ENV_NAMES = (
+    "VN_NEWS_APP_IMAGE_TAG",
+    "VN_NEWS_INFRA_IMAGE_TAG",
+    "VN_NEWS_SERVICES_IMAGE_TAG",
+    "VN_NEWS_IMAGE_REGISTRY",
+    "VN_NEWS_IMAGE_NAMESPACE",
+)
 
 
 def parse_json_manifest(manifest: str) -> dict[str, str]:
@@ -24,90 +32,108 @@ def parse_json_manifest(manifest: str) -> dict[str, str]:
         raise ValueError("image_manifest must be JSON") from error
     if not isinstance(payload, dict):
         raise ValueError("image_manifest JSON must be an object")
-    image_tags = payload.get("image_tags", payload)
-    if not isinstance(image_tags, dict):
-        raise ValueError("image_manifest image_tags must be an object")
+    image_refs = payload
+    if not isinstance(image_refs, dict):
+        raise ValueError("image_manifest image refs must be an object")
     if not all(
-        isinstance(owner, str) and isinstance(tag, str) for owner, tag in image_tags.items()
+        isinstance(image_key, str) and isinstance(image_ref, str)
+        for image_key, image_ref in image_refs.items()
     ):
-        raise ValueError("image_manifest owners and tags must be strings")
-    return image_tags
+        raise ValueError("image_manifest image keys and refs must be strings")
+    return image_refs
 
 
-def parse_image_manifest(manifest: str, catalog: dict) -> dict[str, str]:
+def parse_image_manifest(
+    manifest: str,
+    catalog: dict,
+    *,
+    require_complete: bool = True,
+) -> dict[str, str]:
     normalized = manifest.strip()
     if not normalized:
         raise ValueError("image_manifest is required; deploy does not build images")
 
-    image_tags = parse_json_manifest(normalized)
-    required_owners = set(image_owners(catalog))
-    supplied_owners = set(image_tags)
-    missing = sorted(required_owners - supplied_owners)
-    extra = sorted(supplied_owners - required_owners)
-    if missing:
-        raise ValueError(f"image_manifest is missing image owners: {missing}")
+    image_refs = parse_json_manifest(normalized)
+    required_images = set(catalog["images"])
+    supplied_images = set(image_refs)
+    missing = sorted(required_images - supplied_images)
+    extra = sorted(supplied_images - required_images)
+    if require_complete and missing:
+        raise ValueError(f"image_manifest is missing image keys: {missing}")
     if extra:
-        raise ValueError(f"image_manifest contains unknown image owners: {extra}")
+        raise ValueError(f"image_manifest contains unknown image keys: {extra}")
 
-    for tag in image_tags.values():
-        validate_tag(tag, push=True)
-    return {owner: image_tags[owner] for owner in sorted(image_tags)}
-
-
-def compact_image_manifest(image_tags: dict[str, str]) -> str:
-    return json.dumps(dict(sorted(image_tags.items())), separators=(",", ":"))
+    for image_key, image_ref in image_refs.items():
+        validate_image_ref(catalog, image_key, image_ref)
+    return {image_key: image_refs[image_key] for image_key in sorted(image_refs)}
 
 
-def expected_owner_tag(owner: str, catalog: dict, repositories: dict[str, str]) -> str:
-    parts: list[str] = []
-    for repo_name in owner_source_repositories(catalog, owner):
-        commit_ref = repositories.get(repo_name, "")
-        if len(commit_ref) < 12:
-            raise ValueError(f"Cannot derive image tag for {owner}; missing ref for {repo_name}")
-        parts.append(commit_ref[:12].lower())
-    return "sha-" + "-".join(parts)
+def compact_image_manifest(image_refs: dict[str, str]) -> str:
+    return json.dumps(dict(sorted(image_refs.items())), separators=(",", ":"))
 
 
-def validate_image_manifest_refs(
-    image_tags: dict[str, str],
-    catalog: dict,
-    repositories: dict[str, str],
-) -> None:
-    for owner in image_owners(catalog):
-        expected_tag = expected_owner_tag(owner, catalog, repositories)
-        actual_tag = image_tags[owner]
-        if actual_tag != expected_tag:
-            raise ValueError(
-                f"{owner} image tag must be {expected_tag} for the resolved refs, got {actual_tag}"
-            )
+def validate_image_ref(catalog: dict, image_key: str, image_ref: str) -> None:
+    expected_repository = image_repository_ref(catalog, image_key)
+    if image_ref.startswith(f"{expected_repository}:"):
+        raise ValueError(f"{image_key} image ref must be digest-pinned")
+    if not image_ref.startswith(f"{expected_repository}@sha256:"):
+        raise ValueError(f"{image_key} image ref must start with {expected_repository}@sha256:")
+    if not DIGEST_REF_PATTERN.fullmatch(image_ref):
+        raise ValueError(f"{image_key} image ref must be digest-pinned")
 
 
-def shell_exports(catalog: dict, image_tags: dict[str, str]) -> str:
-    values = {
-        "VN_NEWS_IMAGE_MANIFEST": compact_image_manifest(image_tags),
-        "VN_NEWS_IMAGE_NAMESPACE": catalog_value(catalog, "namespace", "VN_NEWS_IMAGE_NAMESPACE"),
-        "VN_NEWS_IMAGE_REGISTRY": catalog_value(catalog, "registry", "VN_NEWS_IMAGE_REGISTRY"),
-    }
-    values.update({owner_tag_env(catalog, owner): tag for owner, tag in image_tags.items()})
+def shell_exports(catalog: dict, image_refs: dict[str, str], role: str | None = None) -> str:
+    values = {"VN_NEWS_IMAGE_MANIFEST": compact_image_manifest(image_refs)}
+    for image_key, image_ref in image_refs.items():
+        roles = image_roles(catalog, image_key)
+        if role is None or role in roles:
+            values[image_env(catalog, image_key)] = image_ref
     return "".join(f"export {key}={shlex.quote(value)}\n" for key, value in sorted(values.items()))
+
+
+def image_env_names(catalog: dict) -> str:
+    names = sorted(image_env(catalog, image_key) for image_key in catalog["images"])
+    return "".join(f"{name}\n" for name in names)
+
+
+def cleanup_env_names(catalog: dict) -> str:
+    names = sorted(
+        {
+            *DEPRECATED_IMAGE_ENV_NAMES,
+            *(image_env(catalog, key) for key in catalog["images"]),
+        }
+    )
+    return "".join(f"{name}\n" for name in names)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Parse and render deployment image manifests.")
     parser.add_argument("--catalog", type=Path)
     parser.add_argument("--manifest", default=os.environ.get("VN_NEWS_IMAGE_MANIFEST", ""))
-    parser.add_argument("--format", choices=("json", "shell"), default="json")
+    parser.add_argument(
+        "--format",
+        choices=("json", "shell", "env-names", "cleanup-env-names"),
+        default="json",
+    )
+    parser.add_argument("--role", choices=("data", "control", "processing"))
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     catalog = load_image_catalog(args.catalog)
-    image_tags = parse_image_manifest(args.manifest, catalog)
+    if args.format == "env-names":
+        print(image_env_names(catalog), end="")
+        return
+    if args.format == "cleanup-env-names":
+        print(cleanup_env_names(catalog), end="")
+        return
+
+    image_refs = parse_image_manifest(args.manifest, catalog)
     if args.format == "json":
-        print(compact_image_manifest(image_tags))
+        print(compact_image_manifest(image_refs))
     else:
-        print(shell_exports(catalog, image_tags), end="")
+        print(shell_exports(catalog, image_refs, role=args.role), end="")
 
 
 if __name__ == "__main__":
