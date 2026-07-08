@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from scripts.images.build import image_command, validate_tag
 
@@ -39,7 +41,13 @@ def test_pushed_image_uses_catalog_platforms() -> None:
         },
     }
 
-    command = image_command(catalog, "airflow_runtime", "0.2.5", push=True)
+    command = image_command(
+        catalog,
+        "airflow_runtime",
+        "0.2.5",
+        push=True,
+        workspace_root=Path("/workspace"),
+    )
 
     assert "--platform" in command
     assert "linux/amd64,linux/arm64" in command
@@ -62,7 +70,13 @@ def test_local_image_load_does_not_use_multi_platforms() -> None:
         },
     }
 
-    command = image_command(catalog, "airflow_runtime", "local", push=False)
+    command = image_command(
+        catalog,
+        "airflow_runtime",
+        "local",
+        push=False,
+        workspace_root=Path("/workspace"),
+    )
 
     assert "--platform" not in command
     assert "--load" in command

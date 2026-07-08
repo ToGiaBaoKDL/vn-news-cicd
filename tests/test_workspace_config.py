@@ -72,7 +72,7 @@ def test_processing_deploy_waits_for_data_and_spark_master() -> None:
     assert "publish-images" not in workflow["jobs"]
 
 
-def test_deploy_uses_single_image_tag() -> None:
+def test_deploy_uses_image_manifest() -> None:
     workflow = yaml.safe_load(
         Path(".github/workflows/deploy-production.yaml").read_text(encoding="utf-8")
     )
@@ -83,14 +83,15 @@ def test_deploy_uses_single_image_tag() -> None:
             for step in workflow["jobs"][job_name]["steps"]
             if step["name"].startswith("Deploy ")
         )
-        assert deploy_step["env"]["IMAGE_TAG"] == "${{ needs.plan.outputs.image_tag }}"
+        assert deploy_step["env"]["IMAGE_MANIFEST"] == "${{ needs.plan.outputs.image_manifest }}"
         assert (
             deploy_step["env"]["PLATFORM_LIB_REF"]
             == "${{ needs.plan.outputs.vn_news_platform_lib_ref }}"
         )
         assert "RELEASE_TAG" not in deploy_step["env"]
+        assert "IMAGE_TAG" not in deploy_step["env"]
         assert "--role " in deploy_step["run"]
-        assert '--image-tag "$IMAGE_TAG"' in deploy_step["run"]
+        assert '--image-manifest "$IMAGE_MANIFEST"' in deploy_step["run"]
         assert '--platform-lib-ref "$PLATFORM_LIB_REF"' in deploy_step["run"]
 
     validate_deployment_identity_usage()
@@ -105,4 +106,5 @@ def test_deploy_workflow_verifies_existing_images_without_building() -> None:
     assert "python -m scripts.images.build" not in workflow
     assert "python -m scripts.images.publish" not in workflow
     assert "python -m scripts.images.verify" in workflow
+    assert "--image-tag" not in workflow
     assert "--from-tag" not in workflow

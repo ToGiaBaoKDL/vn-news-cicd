@@ -28,33 +28,20 @@ def test_commit_ref_detection_accepts_uppercase_sha() -> None:
     assert refs.is_commit_ref("A" * 40)
 
 
-def test_image_tag_from_manifest_accepts_explicit_tag() -> None:
-    assert refs.image_tag_from_manifest("bundle-abc123", "") == "bundle-abc123"
+def test_image_manifest_rejects_bare_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(refs, "resolve_remote_ref", lambda _owner, _repo_name, _ref: "a" * 40)
 
-
-def test_image_tag_from_manifest_accepts_json_manifest() -> None:
-    assert (
-        refs.image_tag_from_manifest("", '{"image_tag":"bundle-ed750e7c6400d6f3"}')
-        == "bundle-ed750e7c6400d6f3"
-    )
-
-
-def test_image_tag_from_manifest_accepts_text_manifest() -> None:
-    assert (
-        refs.image_tag_from_manifest("", "image_tag=bundle-ed750e7c6400d6f3")
-        == "bundle-ed750e7c6400d6f3"
-    )
-
-
-def test_image_manifest_rejects_bare_tag() -> None:
     with pytest.raises(ValueError, match="Invalid image_manifest entry"):
-        refs.image_tag_from_manifest("", "bundle-ed750e7c6400d6f3")
+        refs.resolve_deploy_refs(
+            owner="example",
+            default_ref="main",
+            ref_overrides={},
+            image_manifest="bundle-ed750e7c6400d6f3",
+        )
 
 
-def test_resolve_deploy_refs_uses_explicit_image_tag(monkeypatch: pytest.MonkeyPatch) -> None:
-    commits = {
-        repo_name: f"{index:040x}" for index, repo_name in enumerate(refs.REPOSITORIES, start=1)
-    }
+def test_resolve_deploy_refs_uses_image_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    commits = {repo_name: str(index) * 40 for index, repo_name in enumerate(refs.REPOSITORIES, 1)}
 
     def fake_resolve_remote_ref(owner: str, repo_name: str, ref: str) -> str:
         assert owner == "example"
@@ -63,24 +50,29 @@ def test_resolve_deploy_refs_uses_explicit_image_tag(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(refs, "resolve_remote_ref", fake_resolve_remote_ref)
 
-    image_tag, repositories = refs.resolve_deploy_refs(
+    image_tags, repositories = refs.resolve_deploy_refs(
         owner="example",
         default_ref="main",
         ref_overrides={},
-        image_tag="sha-123",
-        image_manifest="",
+        image_manifest=(
+            "vn-news-app=sha-111111111111-777777777777,"
+            "vn-news-infra=sha-444444444444,"
+            "vn-news-services=sha-888888888888-777777777777"
+        ),
     )
 
-    assert image_tag == "sha-123"
+    assert image_tags == {
+        "vn-news-app": "sha-111111111111-777777777777",
+        "vn-news-infra": "sha-444444444444",
+        "vn-news-services": "sha-888888888888-777777777777",
+    }
     assert repositories == commits
 
 
-def test_resolve_deploy_refs_requires_existing_image_identity(
+def test_resolve_deploy_refs_rejects_mismatched_image_manifest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    commits = {
-        repo_name: f"{index:040x}" for index, repo_name in enumerate(refs.REPOSITORIES, start=1)
-    }
+    commits = {repo_name: str(index) * 40 for index, repo_name in enumerate(refs.REPOSITORIES, 1)}
 
     monkeypatch.setattr(
         refs,
@@ -88,22 +80,29 @@ def test_resolve_deploy_refs_requires_existing_image_identity(
         lambda _owner, repo_name, _ref: commits[repo_name],
     )
 
-    with pytest.raises(ValueError, match="deploy does not build images"):
+    with pytest.raises(ValueError, match="vn-news-app image tag must be"):
         refs.resolve_deploy_refs(
             owner="example",
             default_ref="main",
             ref_overrides={"vn-news-app": "feature"},
-            image_tag="",
-            image_manifest="",
+            image_manifest=(
+                "vn-news-app=sha-wrong,"
+                "vn-news-infra=sha-444444444444,"
+                "vn-news-services=sha-888888888888-777777777777"
+            ),
         )
 
 
 def test_write_github_output_uses_workflow_safe_names(tmp_path: Path) -> None:
     output_path = tmp_path / "github-output.txt"
 
-    refs.write_github_output("bundle-abc", {"vn-news-app": "a" * 40}, output_path)
+    refs.write_github_output(
+        {"vn-news-app": "sha-a", "vn-news-infra": "sha-b"},
+        {"vn-news-app": "a" * 40},
+        output_path,
+    )
 
     assert output_path.read_text(encoding="utf-8").splitlines() == [
-        "image_tag=bundle-abc",
+        'image_manifest={"vn-news-app":"sha-a","vn-news-infra":"sha-b"}',
         "vn_news_app_ref=" + ("a" * 40),
     ]

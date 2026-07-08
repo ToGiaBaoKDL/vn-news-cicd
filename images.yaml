@@ -1,67 +1,55 @@
-version: 1
+version: 2
 registry: docker.io
 namespace: toilachuoituyet
 platforms:
   - linux/amd64
   - linux/arm64
 
+owners:
+  vn-news-app:
+    tag_env: VN_NEWS_APP_IMAGE_TAG
+    source_repositories:
+      - vn-news-app
+      - vn-news-platform-lib
+  vn-news-infra:
+    tag_env: VN_NEWS_INFRA_IMAGE_TAG
+    source_repositories:
+      - vn-news-infra
+  vn-news-services:
+    tag_env: VN_NEWS_SERVICES_IMAGE_TAG
+    source_repositories:
+      - vn-news-services
+      - vn-news-platform-lib
+
 images:
   app_api:
+    owner: vn-news-app
     image_repository: vn-news-api
-    build:
-      context: vn-news-app
-      dockerfile: api/Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib
 
   app_web:
+    owner: vn-news-app
     image_repository: vn-news-web
-    build:
-      context: vn-news-app
-      dockerfile: web/Dockerfile
 
   infra_airflow_runtime:
+    owner: vn-news-infra
     image_repository: vn-news-airflow-runtime
-    build:
-      context: vn-news-infra/airflow/runtime
-      dockerfile: Dockerfile
 
   service_feed_ingestor:
+    owner: vn-news-services
     image_repository: vn-news-feed-ingestor
-    build:
-      context: vn-news-services
-      dockerfile: services/feed_ingestor/Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib
 
   service_article_fetcher:
+    owner: vn-news-services
     image_repository: vn-news-article-fetcher
-    build:
-      context: vn-news-services
-      dockerfile: services/article_fetcher/Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib
 
   service_article_extractor:
+    owner: vn-news-services
     image_repository: vn-news-article-extractor
-    build:
-      context: vn-news-services
-      dockerfile: services/article_extractor/Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib
 
   service_pipeline_metrics:
+    owner: vn-news-services
     image_repository: vn-news-pipeline-metrics
-    build:
-      context: vn-news-services
-      dockerfile: services/pipeline_metrics/Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib
 
   service_dlq_operator:
+    owner: vn-news-services
     image_repository: vn-news-dlq-operator
-    build:
-      context: vn-news-services
-      dockerfile: services/dlq_operator/Dockerfile
-      additional_contexts:
-        vn-news-platform-lib: vn-news-platform-lib

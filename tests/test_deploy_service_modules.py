@@ -16,6 +16,12 @@ def test_redpanda_provisioning_uses_service_container_rpk() -> None:
     assert "docker run --rm --entrypoint rpk" not in deploy_script
 
 
+def test_deploy_context_shell_quotes_persisted_env_values() -> None:
+    deploy_context = Path("scripts/deploy/lib/context.sh").read_text(encoding="utf-8")
+
+    assert "printf '%s=%q\\n'" in deploy_context
+
+
 def test_airflow_dag_validation_handles_prefixed_logs() -> None:
     output = 'loading config\n[{"dag_id":"vn_news_hourly_ingestion"}]\n'
 

@@ -1,13 +1,12 @@
 UV ?= uv
 UV_CACHE_DIR ?= /tmp/uv-cache
-BUILD_IMAGE_ARGS ?=
-TAG ?= dev
+IMAGE_MANIFEST ?=
 SCHEMA_REGISTRY_ARGS ?=
 STORAGE_BOOTSTRAP_ARGS ?=
 TOPIC_BOOTSTRAP_ARGS ?=
 RPK_COMMAND ?= docker compose -f ../vn-news-infra/compose.yaml exec -T redpanda rpk
 
-.PHONY: install lock validate lint format format-check test build-local-images push-images bootstrap-ingestion bootstrap-storage bootstrap-topics register-event-schemas
+.PHONY: install lock validate lint format format-check test verify-images bootstrap-ingestion bootstrap-storage bootstrap-topics register-event-schemas
 
 install:
 	$(UV) --cache-dir $(UV_CACHE_DIR) sync --all-groups
@@ -30,11 +29,8 @@ format-check:
 test:
 	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m pytest
 
-build-local-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.images.build --tag $(TAG) $(BUILD_IMAGE_ARGS)
-
-push-images:
-	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.images.build --tag $(TAG) --push $(BUILD_IMAGE_ARGS)
+verify-images:
+	$(UV) --cache-dir $(UV_CACHE_DIR) run python -m scripts.images.verify --manifest '$(IMAGE_MANIFEST)'
 
 bootstrap-ingestion: bootstrap-topics register-event-schemas bootstrap-storage
 

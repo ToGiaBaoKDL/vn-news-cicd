@@ -56,7 +56,7 @@ run_role() {
 }
 
 prepare_streamed_deploy() {
-  local role="" image_tag="" infra_ref="" config_ref="" cicd_ref=""
+  local role="" image_manifest="" infra_ref="" config_ref="" cicd_ref=""
   local app_ref="" orchestration_ref="" pipelines_ref="" platform_lib_ref=""
 
   while (($# > 0)); do
@@ -65,8 +65,8 @@ prepare_streamed_deploy() {
         role="${2:?--role requires a value}"
         shift 2
         ;;
-      --image-tag)
-        image_tag="${2:?--image-tag requires a value}"
+      --image-manifest)
+        image_manifest="${2:?--image-manifest requires a value}"
         shift 2
         ;;
       --infra-ref)
@@ -105,7 +105,7 @@ prepare_streamed_deploy() {
   done
 
   : "${role:?--role is required}"
-  : "${image_tag:?--image-tag is required}"
+  : "${image_manifest:?--image-manifest is required}"
   : "${infra_ref:?--infra-ref is required}"
   : "${config_ref:?--config-ref is required}"
   : "${cicd_ref:?--cicd-ref is required}"
@@ -131,7 +131,7 @@ prepare_streamed_deploy() {
 
   export VN_NEWS_DEPLOY_INTERNAL=1
   export VN_NEWS_DEPLOY_ROLE="$role"
-  export VN_NEWS_IMAGE_TAG="$image_tag"
+  export VN_NEWS_IMAGE_MANIFEST="$image_manifest"
   export VN_NEWS_DEPLOY_INFRA_REF="$infra_ref"
   export VN_NEWS_DEPLOY_CONFIG_REF="$config_ref"
   export VN_NEWS_DEPLOY_PLATFORM_LIB_REF="$platform_lib_ref"

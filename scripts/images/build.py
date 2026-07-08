@@ -3,14 +3,16 @@ from __future__ import annotations
 import argparse
 import shlex
 import subprocess
+from pathlib import Path
 
 from scripts.images.catalog import image_reference, load_image_catalog
 from scripts.images.tags import validate_tag
-from scripts.paths import WORKSPACE_ROOT
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build images declared in images.yaml.")
+    parser.add_argument("--catalog", type=Path, required=True)
+    parser.add_argument("--workspace-root", type=Path, required=True)
     parser.add_argument("--image", action="append", dest="images")
     parser.add_argument("--tag", required=True)
     parser.add_argument("--push", action="store_true")
@@ -23,10 +25,11 @@ def image_command(
     image_key: str,
     tag: str,
     push: bool,
+    workspace_root: Path,
 ) -> list[str]:
     image = catalog["images"][image_key]
     build = image["build"]
-    context = WORKSPACE_ROOT / build["context"]
+    context = workspace_root / build["context"]
     command = [
         "docker",
         "buildx",
@@ -40,7 +43,7 @@ def image_command(
     if push and platforms:
         command.extend(["--platform", ",".join(platforms)])
     for name, path in sorted(build.get("additional_contexts", {}).items()):
-        command.extend(["--build-context", f"{name}={WORKSPACE_ROOT / path}"])
+        command.extend(["--build-context", f"{name}={workspace_root / path}"])
     command.append("--push" if push else "--load")
     command.append(str(context))
     return command
@@ -48,7 +51,7 @@ def image_command(
 
 def main() -> None:
     args = parse_args()
-    catalog = load_image_catalog()
+    catalog = load_image_catalog(args.catalog)
     validate_tag(args.tag, push=args.push)
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))
@@ -62,6 +65,7 @@ def main() -> None:
             image_key,
             args.tag,
             args.push,
+            args.workspace_root.resolve(),
         )
         print(shlex.join(command))
         if not args.dry_run:

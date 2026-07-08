@@ -2,7 +2,7 @@
 # shellcheck disable=SC2030,SC2031
 
 role="${VN_NEWS_DEPLOY_ROLE:?VN_NEWS_DEPLOY_ROLE is required}"
-image_tag="${VN_NEWS_IMAGE_TAG:?VN_NEWS_IMAGE_TAG is required}"
+image_manifest="${VN_NEWS_IMAGE_MANIFEST:?VN_NEWS_IMAGE_MANIFEST is required}"
 infra_ref="${VN_NEWS_DEPLOY_INFRA_REF:?VN_NEWS_DEPLOY_INFRA_REF is required}"
 config_ref="${VN_NEWS_DEPLOY_CONFIG_REF:-}"
 platform_lib_ref="${VN_NEWS_DEPLOY_PLATFORM_LIB_REF:-}"
@@ -62,28 +62,26 @@ load_role_env() {
   source "$env_file"
   set +a
 
-  export VN_NEWS_IMAGE_TAG="$image_tag"
+  export VN_NEWS_IMAGE_MANIFEST="$image_manifest"
   export VN_NEWS_SECRETS_HOST_DIR="${VN_NEWS_SECRETS_HOST_DIR:-/run/vn-news/secrets}"
 }
 
 load_image_env() {
-  local images_manifest="$cicd_root/images.yaml"
-  local registry namespace
-
-  if [[ ! -f "$images_manifest" ]]; then
-    echo "Missing image manifest: $images_manifest" >&2
+  if [[ ! -f "$cicd_root/images.yaml" ]]; then
+    echo "Missing image catalog: $cicd_root/images.yaml" >&2
     exit 1
   fi
 
-  registry="$(awk -F': *' '$1 == "registry" {print $2; exit}' "$images_manifest")"
-  namespace="$(awk -F': *' '$1 == "namespace" {print $2; exit}' "$images_manifest")"
-  export VN_NEWS_IMAGE_REGISTRY="$registry"
-  export VN_NEWS_IMAGE_NAMESPACE="$namespace"
-
-  if [[ -z "$VN_NEWS_IMAGE_REGISTRY" || -z "$VN_NEWS_IMAGE_NAMESPACE" ]]; then
-    echo "Image registry and namespace are required in $images_manifest" >&2
-    exit 1
-  fi
+  local image_env_tmp
+  image_env_tmp="$(mktemp)"
+  run_cicd_module scripts.images.manifest \
+    --manifest "$image_manifest" \
+    --format shell >"$image_env_tmp"
+  set -a
+  # shellcheck disable=SC1090
+  source "$image_env_tmp"
+  set +a
+  rm -f "$image_env_tmp"
 }
 
 require_file() {
@@ -101,7 +99,7 @@ set_role_env_value() {
   local value="$2"
 
   sudo sed -i "/^${key}=/d" "$env_file"
-  printf '%s=%s\n' "$key" "$value" | sudo tee -a "$env_file" >/dev/null
+  printf '%s=%q\n' "$key" "$value" | sudo tee -a "$env_file" >/dev/null
 }
 
 prepare_deploy_context() {
@@ -110,15 +108,16 @@ prepare_deploy_context() {
   checkout_config_repo
   checkout_platform_lib_repo
   load_role_env
-  set_role_env_value VN_NEWS_IMAGE_TAG "$image_tag"
-  if [[ "$role" != "data" ]]; then
-    load_image_env
-    set_role_env_value VN_NEWS_IMAGE_REGISTRY "$VN_NEWS_IMAGE_REGISTRY"
-    set_role_env_value VN_NEWS_IMAGE_NAMESPACE "$VN_NEWS_IMAGE_NAMESPACE"
-  fi
   set_config_paths
   prepare_cicd_python
-  echo "deployment context: role=$role image=$image_tag"
+  load_image_env
+  set_role_env_value VN_NEWS_IMAGE_MANIFEST "$VN_NEWS_IMAGE_MANIFEST"
+  set_role_env_value VN_NEWS_IMAGE_REGISTRY "$VN_NEWS_IMAGE_REGISTRY"
+  set_role_env_value VN_NEWS_IMAGE_NAMESPACE "$VN_NEWS_IMAGE_NAMESPACE"
+  set_role_env_value VN_NEWS_APP_IMAGE_TAG "$VN_NEWS_APP_IMAGE_TAG"
+  set_role_env_value VN_NEWS_INFRA_IMAGE_TAG "$VN_NEWS_INFRA_IMAGE_TAG"
+  set_role_env_value VN_NEWS_SERVICES_IMAGE_TAG "$VN_NEWS_SERVICES_IMAGE_TAG"
+  echo "deployment context: role=$role images=$VN_NEWS_IMAGE_MANIFEST"
 }
 
 repo_commit() {
@@ -177,7 +176,7 @@ for line in os.environ.get("VN_NEWS_DEPLOY_METADATA_REPOSITORIES", "").splitline
 
 payload = {
     "role": os.environ["VN_NEWS_DEPLOY_ROLE"],
-    "image_tag": os.environ["VN_NEWS_IMAGE_TAG"],
+    "image_manifest": json.loads(os.environ["VN_NEWS_IMAGE_MANIFEST"]),
     "deployed_at": os.environ["VN_NEWS_DEPLOY_METADATA_DEPLOYED_AT"],
     "repositories": repositories,
 }

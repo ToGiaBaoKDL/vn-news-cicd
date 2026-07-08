@@ -25,6 +25,16 @@ REPOSITORY_ROOTS = (
     PLATFORM_LIB_ROOT,
     SERVICES_ROOT,
 )
+REPOSITORY_NAMES = (
+    "vn-news-app",
+    "vn-news-cicd",
+    "vn-news-config",
+    "vn-news-infra",
+    "vn-news-orchestration",
+    "vn-news-pipelines",
+    "vn-news-platform-lib",
+    "vn-news-services",
+)
 
 ACTION_REF_PATTERN = re.compile(r"uses:\s*([^@\s]+)@([^\s#]+)")
 IMMUTABLE_ACTION_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
@@ -33,6 +43,7 @@ REQUIRED_SCRIPT_MODULES = (
     "scripts/deploy/refs.py",
     "scripts/images/build.py",
     "scripts/images/catalog.py",
+    "scripts/images/manifest.py",
     "scripts/images/tags.py",
     "scripts/images/verify.py",
     "scripts/services/airflow/validate_dag.py",
@@ -135,6 +146,7 @@ def validate_workflow_action_pins() -> None:
             continue
         for pattern in ("*.yaml", "*.yml"):
             for path in sorted(workflow_root.glob(pattern)):
+                load_yaml(path)
                 content = path.read_text(encoding="utf-8")
                 for action, ref in ACTION_REF_PATTERN.findall(content):
                     validate_workflow_action_ref(path.relative_to(WORKSPACE_ROOT), action, ref)
@@ -152,15 +164,28 @@ def validate_deployment_identity_usage() -> None:
         content = path.read_text(encoding="utf-8")
         if "${VN_NEWS_RELEASE_TAG" in content:
             relative_path = path.relative_to(WORKSPACE_ROOT)
-            raise ValueError(f"{relative_path} must use VN_NEWS_IMAGE_TAG for images")
+            raise ValueError(f"{relative_path} must use image manifest tags")
+        if "VN_NEWS_IMAGE_TAG" in content:
+            relative_path = path.relative_to(WORKSPACE_ROOT)
+            raise ValueError(f"{relative_path} must not use global VN_NEWS_IMAGE_TAG")
 
     for role in ("data", "control", "processing"):
         env_template = INFRA_ROOT / "env" / f"{role}.env.example"
         content = env_template.read_text(encoding="utf-8")
-        if content.count("VN_NEWS_IMAGE_TAG=") != 1:
-            raise ValueError(f"{env_template} must define VN_NEWS_IMAGE_TAG exactly once")
-        if "VN_NEWS_RELEASE_TAG=" in content:
-            raise ValueError(f"{env_template} must not define VN_NEWS_RELEASE_TAG")
+        required_variables = (
+            "VN_NEWS_IMAGE_MANIFEST",
+            "VN_NEWS_APP_IMAGE_TAG",
+            "VN_NEWS_INFRA_IMAGE_TAG",
+            "VN_NEWS_SERVICES_IMAGE_TAG",
+            "VN_NEWS_IMAGE_REGISTRY",
+            "VN_NEWS_IMAGE_NAMESPACE",
+        )
+        for variable in required_variables:
+            if content.count(f"{variable}=") != 1:
+                raise ValueError(f"{env_template} must define {variable} exactly once")
+        for variable in ("VN_NEWS_RELEASE_TAG", "VN_NEWS_IMAGE_TAG"):
+            if f"{variable}=" in content:
+                raise ValueError(f"{env_template} must not define {variable}")
 
     for relative_path in (
         "scripts/deploy/production.sh",
@@ -168,7 +193,11 @@ def validate_deployment_identity_usage() -> None:
         ".github/workflows/deploy-production.yaml",
     ):
         content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
-        for variable in ("VN_NEWS_DEPLOY_RELEASE_TAG", "VN_NEWS_DEPLOY_IMAGE_TAG"):
+        for variable in (
+            "VN_NEWS_DEPLOY_RELEASE_TAG",
+            "VN_NEWS_DEPLOY_IMAGE_TAG",
+            "VN_NEWS_IMAGE_TAG",
+        ):
             if variable in content:
                 raise ValueError(f"{relative_path} must not use {variable}")
 
@@ -181,11 +210,20 @@ def validate_deployment_identity_usage() -> None:
         raise ValueError("deploy workflow must not build images")
     if "python -m scripts.images.verify" not in deploy_workflow:
         raise ValueError("deploy workflow must verify deployment images")
+    if "--image-tag" in deploy_workflow or "inputs.image_tag" in deploy_workflow:
+        raise ValueError("deploy workflow must use image_manifest, not a global image tag")
 
     deploy_context = (CICD_ROOT / "scripts" / "deploy" / "lib" / "context.sh").read_text(
         encoding="utf-8"
     )
-    for variable in ("VN_NEWS_IMAGE_TAG", "VN_NEWS_IMAGE_REGISTRY", "VN_NEWS_IMAGE_NAMESPACE"):
+    for variable in (
+        "VN_NEWS_IMAGE_MANIFEST",
+        "VN_NEWS_APP_IMAGE_TAG",
+        "VN_NEWS_INFRA_IMAGE_TAG",
+        "VN_NEWS_SERVICES_IMAGE_TAG",
+        "VN_NEWS_IMAGE_REGISTRY",
+        "VN_NEWS_IMAGE_NAMESPACE",
+    ):
         if f"set_role_env_value {variable}" not in deploy_context:
             raise ValueError(f"deployment context must persist {variable}")
     if "write_deployment_metadata" not in deploy_context:
@@ -232,25 +270,101 @@ def validate_script_layout() -> None:
 
 def validate_image_catalog() -> None:
     catalog = load_yaml(CICD_ROOT / "images.yaml")
-    if catalog.get("version") != 1:
-        raise ValueError("images.yaml version must be 1")
+    if catalog.get("version") != 2:
+        raise ValueError("images.yaml version must be 2")
     for field in ("registry", "namespace"):
         if not catalog.get(field):
             raise ValueError(f"images.yaml missing required field: {field}")
 
+    owners = catalog.get("owners", {})
+    if not isinstance(owners, dict) or not owners:
+        raise ValueError("images.yaml must define image owners")
+    tag_envs = [owner_config.get("tag_env") for owner_config in owners.values()]
+    duplicate_tag_envs = sorted(tag_env for tag_env in set(tag_envs) if tag_envs.count(tag_env) > 1)
+    if duplicate_tag_envs:
+        raise ValueError(f"Duplicate image owner tag envs in images.yaml: {duplicate_tag_envs}")
+    for owner, owner_config in sorted(owners.items()):
+        if owner not in REPOSITORY_NAMES:
+            raise ValueError(f"Unknown image owner repository in images.yaml: {owner}")
+        if not owner_config.get("tag_env"):
+            raise ValueError(f"Image owner {owner} is missing tag_env")
+        source_repositories = owner_config.get("source_repositories")
+        if not isinstance(source_repositories, list) or not source_repositories:
+            raise ValueError(f"Image owner {owner} is missing source_repositories")
+        unknown_sources = sorted(set(source_repositories) - set(REPOSITORY_NAMES))
+        if unknown_sources:
+            raise ValueError(f"Image owner {owner} has unknown sources: {unknown_sources}")
+
     repositories: list[str] = []
+    images_by_owner: dict[str, set[str]] = {owner: set() for owner in owners}
     for image_key, image in catalog.get("images", {}).items():
+        owner = image.get("owner")
+        if owner not in owners:
+            raise ValueError(f"Image {image_key} has unknown owner: {owner}")
+        if "build" in image:
+            raise ValueError(f"Deployment image catalog must not define build for {image_key}")
+        images_by_owner[owner].add(image_key)
         repository = image.get("image_repository")
         if not repository:
             raise ValueError(f"Image {image_key} is missing image_repository")
         repositories.append(repository)
-        validate_image_build(image_key, image.get("build", {}))
 
     duplicates = sorted(
         repository for repository in set(repositories) if repositories.count(repository) > 1
     )
     if duplicates:
         raise ValueError(f"Duplicate Docker image repositories in images.yaml: {duplicates}")
+
+    validate_source_image_catalogs(catalog, images_by_owner)
+
+
+SOURCE_IMAGE_CATALOGS = {
+    "vn-news-app": APP_ROOT,
+    "vn-news-infra": INFRA_ROOT,
+    "vn-news-services": SERVICES_ROOT,
+}
+
+
+def validate_source_image_catalogs(
+    deploy_catalog: dict,
+    deploy_images_by_owner: dict[str, set[str]],
+) -> None:
+    for owner, root in SOURCE_IMAGE_CATALOGS.items():
+        catalog_path = root / "images.yaml"
+        if not catalog_path.is_file():
+            raise ValueError(f"{owner} must define images.yaml")
+        source_catalog = load_yaml(catalog_path)
+        if source_catalog.get("version") != 1:
+            raise ValueError(f"{catalog_path} version must be 1")
+        if source_catalog.get("owner") != owner:
+            raise ValueError(f"{catalog_path} owner must be {owner}")
+        source_images = set(source_catalog.get("images", {}))
+        if source_images != deploy_images_by_owner.get(owner, set()):
+            raise ValueError(f"{catalog_path} images must match deployment catalog")
+        for image_key, image in source_catalog.get("images", {}).items():
+            deploy_image = deploy_catalog["images"][image_key]
+            if image.get("image_repository") != deploy_image.get("image_repository"):
+                raise ValueError(f"{catalog_path} repository drift for {image_key}")
+            validate_image_build(image_key, image.get("build", {}))
+        validate_source_image_workflow(owner, root)
+
+
+def validate_source_image_workflow(owner: str, root: Path) -> None:
+    workflow_path = root / ".github" / "workflows" / "publish-images.yaml"
+    if not workflow_path.is_file():
+        raise ValueError(f"{owner} must define publish-images workflow")
+    workflow = workflow_path.read_text(encoding="utf-8")
+    required_fragments = (
+        "python -m scripts.images.build",
+        f"--catalog ../{owner}/images.yaml",
+        "--workspace-root ..",
+        "--push",
+    )
+    for fragment in required_fragments:
+        if fragment not in workflow:
+            raise ValueError(f"{workflow_path} missing image publish fragment: {fragment}")
+    if owner in {"vn-news-app", "vn-news-services"} and "platform_lib_ref" not in workflow:
+        raise ValueError(f"{workflow_path} must include platform_lib_ref input")
 
 
 def validate_image_build(image_key: str, build: dict) -> None:

@@ -3,15 +3,9 @@ name: Deploy Production
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: Published immutable image tag shorthand. Required if image_manifest is empty.
-        required: false
-        default: ""
-        type: string
       image_manifest:
-        description: Published image manifest JSON or key-value text. Must include image_tag unless image_tag is set.
-        required: false
-        default: ""
+        description: Published image owner tags as JSON or key-value text.
+        required: true
         type: string
       default_ref:
         description: Default ref for all repositories.
@@ -36,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      image_tag: ${{ steps.refs.outputs.image_tag }}
+      image_manifest: ${{ steps.refs.outputs.image_manifest }}
       vn_news_app_ref: ${{ steps.refs.outputs.vn_news_app_ref }}
       vn_news_cicd_ref: ${{ steps.refs.outputs.vn_news_cicd_ref }}
       vn_news_config_ref: ${{ steps.refs.outputs.vn_news_config_ref }}
@@ -62,14 +56,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.WORKSPACE_READ_TOKEN || github.token }}
           DEFAULT_REF: ${{ inputs.default_ref }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
           IMAGE_MANIFEST: ${{ inputs.image_manifest }}
           REPO_REFS: ${{ inputs.repo_refs }}
         run: |
           uv run --no-project --python 3.12 python -m scripts.deploy.refs \
             --default-ref "$DEFAULT_REF" \
             --refs "$REPO_REFS" \
-            --image-tag "$IMAGE_TAG" \
             --image-manifest "$IMAGE_MANIFEST" \
             --github-output "$GITHUB_OUTPUT"
 
@@ -170,8 +162,8 @@ jobs:
       - name: Verify deployment images
         working-directory: vn-news-cicd
         env:
-          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
-        run: uv run python -m scripts.images.verify --tag "$IMAGE_TAG"
+          IMAGE_MANIFEST: ${{ needs.plan.outputs.image_manifest }}
+        run: uv run python -m scripts.images.verify --manifest "$IMAGE_MANIFEST"
 
   deploy-data:
     needs: [plan, verify-images]
@@ -200,7 +192,7 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          IMAGE_MANIFEST: ${{ needs.plan.outputs.image_manifest }}
           INFRA_REF: ${{ needs.plan.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.plan.outputs.vn_news_config_ref }}
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
@@ -208,7 +200,7 @@ jobs:
         run: |
           ssh "$USER@$HOST" bash -s -- \
             --role data \
-            --image-tag "$IMAGE_TAG" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
@@ -242,7 +234,7 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          IMAGE_MANIFEST: ${{ needs.plan.outputs.image_manifest }}
           INFRA_REF: ${{ needs.plan.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.plan.outputs.vn_news_config_ref }}
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
@@ -253,7 +245,7 @@ jobs:
         run: |
           ssh "$USER@$HOST" bash -s -- \
             --role control \
-            --image-tag "$IMAGE_TAG" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
@@ -290,7 +282,7 @@ jobs:
         env:
           HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
           USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-          IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
+          IMAGE_MANIFEST: ${{ needs.plan.outputs.image_manifest }}
           INFRA_REF: ${{ needs.plan.outputs.vn_news_infra_ref }}
           CONFIG_REF: ${{ needs.plan.outputs.vn_news_config_ref }}
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
@@ -298,7 +290,7 @@ jobs:
         run: |
           ssh "$USER@$HOST" bash -s -- \
             --role processing \
-            --image-tag "$IMAGE_TAG" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \

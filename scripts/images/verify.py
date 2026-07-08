@@ -4,8 +4,8 @@ import argparse
 import json
 import subprocess
 
-from scripts.images.catalog import image_reference, load_image_catalog
-from scripts.images.tags import validate_tag
+from scripts.images.catalog import image_owner, image_reference, load_image_catalog
+from scripts.images.manifest import parse_image_manifest
 
 
 def manifest_platforms(manifest: dict) -> set[str]:
@@ -41,14 +41,14 @@ def verify_image(reference: str, required_platforms: set[str]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Verify published images declared in images.yaml.")
     parser.add_argument("--image", action="append", dest="images")
-    parser.add_argument("--tag", required=True)
+    parser.add_argument("--manifest", required=True)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    validate_tag(args.tag, push=True)
     catalog = load_image_catalog()
+    image_tags = parse_image_manifest(args.manifest, catalog)
     image_keys = args.images or sorted(catalog["images"])
     unknown_images = sorted(set(image_keys) - set(catalog["images"]))
     if unknown_images:
@@ -56,7 +56,10 @@ def main() -> None:
 
     required_platforms = set(catalog["platforms"])
     for image_key in image_keys:
-        verify_image(image_reference(catalog, image_key, args.tag), required_platforms)
+        verify_image(
+            image_reference(catalog, image_key, image_tags[image_owner(catalog, image_key)]),
+            required_platforms,
+        )
 
 
 if __name__ == "__main__":
