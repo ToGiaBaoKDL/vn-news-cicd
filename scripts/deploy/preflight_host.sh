@@ -75,7 +75,6 @@ case "$role" in
     ;;
   control)
     require_env_value VN_NEWS_CONTROL_PRIVATE_IP
-    require_env_value VN_NEWS_SPARK_IMAGE
     require_env_value VN_NEWS_SPARK_MASTER_PORT
     require_env_value VN_NEWS_SPARK_MASTER_UI_PORT
     require_env_value VN_NEWS_SPARK_DRIVER_PORT
@@ -91,7 +90,6 @@ case "$role" in
     require_env_value VN_NEWS_AIRFLOW_API_JWT_SECRET_OCID
     require_env_value VN_NEWS_AIRFLOW_FERNET_KEY_SECRET_OCID
     require_env_value VN_NEWS_AIRFLOW_ADMIN_PASSWORD_SECRET_OCID
-    require_env_value VN_NEWS_AIRFLOW_EXPECTED_DAG_ID
     require_env_value VN_NEWS_CLOUDFLARE_CONTROL_TUNNEL_TOKEN_SECRET_OCID
     require_directory /srv/vn-news-control/airflow-db
     require_directory /srv/vn-news-control/airflow-dag-bundles
@@ -101,7 +99,6 @@ case "$role" in
   processing)
     require_env_value VN_NEWS_PROCESSING_PRIVATE_IP
     require_env_value VN_NEWS_STORAGE_ENDPOINT_URL
-    require_env_value VN_NEWS_SPARK_IMAGE
     require_env_value VN_NEWS_SPARK_MASTER_URL
     require_env_value VN_NEWS_SPARK_MASTER_UI_PORT
     require_env_value VN_NEWS_SPARK_WORKER_PORT

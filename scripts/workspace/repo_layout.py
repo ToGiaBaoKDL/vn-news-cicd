@@ -17,7 +17,6 @@ REQUIRED_SCRIPT_FILES = (
     "scripts/images/promote.py",
     "scripts/images/tags.py",
     "scripts/images/verify.py",
-    "scripts/services/airflow/validate_dag.py",
     "scripts/services/polaris/cli.py",
     "scripts/services/polaris/config.py",
     "scripts/services/polaris/provision.py",

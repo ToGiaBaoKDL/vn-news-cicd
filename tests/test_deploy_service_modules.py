@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scripts.services.airflow import validate_dag
 from scripts.services.polaris import vault
 from scripts.services.spark import validate_cluster
 
@@ -22,24 +21,12 @@ def test_deploy_context_shell_quotes_persisted_env_values() -> None:
     assert "printf '%s=%q\\n'" in deploy_context
 
 
-def test_deploy_context_cleans_legacy_image_env() -> None:
+def test_deploy_context_refreshes_manifest_image_env() -> None:
     deploy_context = Path("scripts/deploy/lib/context.sh").read_text(encoding="utf-8")
 
-    assert "cleanup_legacy_image_env" in deploy_context
-    assert "VN_NEWS_IMAGE_TAG" in deploy_context
-    assert "VN_NEWS_IMAGE_REGISTRY" in deploy_context
-    assert "VN_NEWS_IMAGE_NAMESPACE" in deploy_context
-    assert "VN_NEWS_APP_IMAGE_TAG" in deploy_context
-    assert "VN_NEWS_DEPLOY_IMAGE_TAG" in deploy_context
-    assert "VN_NEWS_INFRA_IMAGE_TAG" in deploy_context
-    assert "VN_NEWS_SERVICES_IMAGE_TAG" in deploy_context
-
-
-def test_airflow_dag_validation_handles_prefixed_logs() -> None:
-    output = 'loading config\n[{"dag_id":"vn_news_hourly_ingestion"}]\n'
-
-    assert validate_dag.has_dag(output, "vn_news_hourly_ingestion")
-    assert not validate_dag.has_dag(output, "missing_dag")
+    assert "cleanup_image_env" in deploy_context
+    assert "--format cleanup-env-names" in deploy_context
+    assert 'unset "$key"' in deploy_context
 
 
 def test_spark_worker_validation_requires_alive_worker_host() -> None:

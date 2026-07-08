@@ -90,16 +90,6 @@ def validate_deploy_workflow() -> None:
     if "digest-pinned image refs" not in deploy_workflow.lower():
         raise ValueError("deploy workflow must document digest-pinned image manifests")
 
-    for stale_fragment in (
-        "base_deploy_run_id",
-        "base_image_manifest",
-        "inputs.image_manifest",
-        "--manual",
-        '--base "$',
-    ):
-        if stale_fragment in deploy_workflow:
-            raise ValueError(f"deploy workflow contains stale manifest fallback: {stale_fragment}")
-
     for fragment in (
         "actions/download-artifact@",
         "actions/upload-artifact@",
@@ -129,17 +119,6 @@ def validate_deploy_context() -> None:
         or "--format cleanup-env-names" not in deploy_context
     ):
         raise ValueError("deployment context must refresh image env before deploy")
-    for legacy_key in (
-        "VN_NEWS_IMAGE_TAG",
-        "VN_NEWS_IMAGE_REGISTRY",
-        "VN_NEWS_IMAGE_NAMESPACE",
-        "VN_NEWS_APP_IMAGE_TAG",
-        "VN_NEWS_DEPLOY_IMAGE_TAG",
-        "VN_NEWS_INFRA_IMAGE_TAG",
-        "VN_NEWS_SERVICES_IMAGE_TAG",
-    ):
-        if legacy_key not in deploy_context:
-            raise ValueError(f"deployment context must remove legacy image env: {legacy_key}")
     if "set_role_env_value" not in deploy_context:
         raise ValueError("deployment context must persist rendered image env")
     if "write_deployment_metadata" not in deploy_context:
@@ -167,25 +146,3 @@ def validate_deploy_service_lifecycle() -> None:
         for hook in hooks:
             if f"{hook}()" not in content:
                 raise ValueError(f"{service_file} missing lifecycle hook: {hook}")
-
-    for relative_path in (
-        "scripts/deploy/roles/data.sh",
-        "scripts/deploy/roles/control.sh",
-        "scripts/deploy/roles/processing.sh",
-        "scripts/deploy/services/redpanda.sh",
-        "scripts/deploy/services/seaweedfs.sh",
-        "Makefile",
-    ):
-        content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
-        for stale_fragment in (
-            "bootstrap_redpanda_topics",
-            "bootstrap_redpanda_schemas",
-            "bootstrap_seaweedfs_buckets",
-            "bootstrap_topics.py",
-            "bootstrap_buckets.py",
-            "bootstrap-topics",
-            "bootstrap-storage",
-            "bootstrap-ingestion",
-        ):
-            if stale_fragment in content:
-                raise ValueError(f"{relative_path} contains stale bootstrap fragment")
