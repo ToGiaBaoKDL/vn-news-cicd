@@ -25,15 +25,12 @@ def parse_json_manifest(manifest: str) -> dict[str, str]:
         raise ValueError("image_manifest must be JSON") from error
     if not isinstance(payload, dict):
         raise ValueError("image_manifest JSON must be an object")
-    image_refs = payload
-    if not isinstance(image_refs, dict):
-        raise ValueError("image_manifest image refs must be an object")
     if not all(
         isinstance(image_key, str) and isinstance(image_ref, str)
-        for image_key, image_ref in image_refs.items()
+        for image_key, image_ref in payload.items()
     ):
         raise ValueError("image_manifest image keys and refs must be strings")
-    return image_refs
+    return payload
 
 
 def parse_image_manifest(

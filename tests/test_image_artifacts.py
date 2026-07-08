@@ -67,3 +67,30 @@ def test_run_has_artifact_ignores_expired_artifacts(monkeypatch: pytest.MonkeyPa
         artifact_name="image-manifest",
         token="token",
     )
+
+
+def test_resolve_manifest_run_ids_rejects_manual_with_artifacts() -> None:
+    with pytest.raises(ValueError, match="manual image_manifest"):
+        artifacts.resolve_manifest_run_ids(
+            owner="owner",
+            branch="main",
+            workflow_name="Publish Images",
+            artifact_name="image-manifest",
+            token="token",
+            provided_run_ids={"app": "123", "infra": "", "services": ""},
+            manual_manifest='{"app":"ref"}',
+        )
+
+
+def test_resolve_manifest_run_ids_rejects_duplicate_base_sources() -> None:
+    with pytest.raises(ValueError, match="one base manifest source"):
+        artifacts.resolve_manifest_run_ids(
+            owner="owner",
+            branch="main",
+            workflow_name="Publish Images",
+            artifact_name="image-manifest",
+            token="token",
+            provided_run_ids={"app": "", "infra": "", "services": ""},
+            base_manifest='{"app":"ref"}',
+            base_run_id="456",
+        )

@@ -88,10 +88,17 @@ def resolve_manifest_run_ids(
     base_manifest: str = "",
     base_run_id: str = "",
 ) -> dict[str, str]:
+    provided = {key: value.strip() for key, value in provided_run_ids.items()}
+    provided_artifacts = {key: value for key, value in provided.items() if value}
+    if manual_manifest.strip() and (base_manifest.strip() or base_run_id or provided_artifacts):
+        raise ValueError("manual image_manifest cannot be combined with promotion artifacts")
+    if base_manifest.strip() and base_run_id:
+        raise ValueError("Use only one base manifest source")
+
     should_discover = not manual_manifest.strip() and not base_manifest.strip() and not base_run_id
     resolved: dict[str, str] = {}
     for key, repo in SOURCE_REPOSITORIES.items():
-        run_id = provided_run_ids.get(key, "").strip()
+        run_id = provided.get(key, "")
         if not run_id and should_discover:
             run_id = latest_artifact_run_id(
                 owner=owner,

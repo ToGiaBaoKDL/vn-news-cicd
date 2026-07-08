@@ -40,7 +40,8 @@ DEPLOY_ROLES = ("data", "control", "processing")
 ACTION_REF_PATTERN = re.compile(r"uses:\s*([^@\s]+)@([^\s#]+)")
 IMMUTABLE_ACTION_REF_PATTERN = re.compile(r"[0-9a-f]{40}")
 
-REQUIRED_SCRIPT_MODULES = (
+REQUIRED_SCRIPT_FILES = (
+    "scripts/deploy/remote_node.sh",
     "scripts/deploy/refs.py",
     "scripts/images/artifacts.py",
     "scripts/images/build.py",
@@ -180,11 +181,23 @@ def validate_deployment_identity_usage() -> None:
     if "write_deployment_metadata" not in deploy_context:
         raise ValueError("deployment context must persist deployed commit metadata")
 
+    remote_deploy = (CICD_ROOT / "scripts" / "deploy" / "remote_node.sh").read_text(
+        encoding="utf-8"
+    )
+    for fragment in (
+        "preflight_host.sh",
+        "production.sh",
+        'image_manifest_arg="$(printf',
+        '--image-manifest "$image_manifest_arg"',
+    ):
+        if fragment not in remote_deploy:
+            raise ValueError(f"remote deploy wrapper missing fragment: {fragment}")
+
 
 def validate_script_layout() -> None:
-    missing_modules = [path for path in REQUIRED_SCRIPT_MODULES if not (CICD_ROOT / path).is_file()]
-    if missing_modules:
-        raise ValueError(f"Missing modular CICD script modules: {missing_modules}")
+    missing_scripts = [path for path in REQUIRED_SCRIPT_FILES if not (CICD_ROOT / path).is_file()]
+    if missing_scripts:
+        raise ValueError(f"Missing modular CICD script files: {missing_scripts}")
 
     missing_deploy_services = [
         path for path in REQUIRED_DEPLOY_SERVICE_FILES if not (CICD_ROOT / path).is_file()

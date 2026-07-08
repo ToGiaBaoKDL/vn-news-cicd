@@ -283,12 +283,6 @@ jobs:
           private-key: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           known-hosts: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
 
-      - name: Preflight data node
-        env:
-          HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
-          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-        run: ssh "$USER@$HOST" bash -s -- data < scripts/deploy/preflight_host.sh
-
       - name: Deploy data node
         env:
           HOST: ${{ vars.ORACLE_DATA_HOST || secrets.ORACLE_DATA_HOST }}
@@ -299,15 +293,15 @@ jobs:
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
           PLATFORM_LIB_REF: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
         run: |
-          image_manifest_arg="$(printf '%q' "$IMAGE_MANIFEST")"
-          ssh "$USER@$HOST" bash -s -- \
+          scripts/deploy/remote_node.sh \
             --role data \
-            --image-manifest "$image_manifest_arg" \
+            --host "$HOST" \
+            --user "$USER" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
-            --platform-lib-ref "$PLATFORM_LIB_REF" \
-            < scripts/deploy/production.sh
+            --platform-lib-ref "$PLATFORM_LIB_REF"
 
   deploy-control:
     needs: [plan, verify-images, deploy-data]
@@ -326,12 +320,6 @@ jobs:
           private-key: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           known-hosts: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
 
-      - name: Preflight control node
-        env:
-          HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
-          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-        run: ssh "$USER@$HOST" bash -s -- control < scripts/deploy/preflight_host.sh
-
       - name: Deploy control node
         env:
           HOST: ${{ vars.ORACLE_CONTROL_HOST || secrets.ORACLE_CONTROL_HOST }}
@@ -345,18 +333,18 @@ jobs:
           APP_REF: ${{ needs.plan.outputs.vn_news_app_ref }}
           PIPELINES_REF: ${{ needs.plan.outputs.vn_news_pipelines_ref }}
         run: |
-          image_manifest_arg="$(printf '%q' "$IMAGE_MANIFEST")"
-          ssh "$USER@$HOST" bash -s -- \
+          scripts/deploy/remote_node.sh \
             --role control \
-            --image-manifest "$image_manifest_arg" \
+            --host "$HOST" \
+            --user "$USER" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
             --platform-lib-ref "$PLATFORM_LIB_REF" \
             --orchestration-ref "$ORCHESTRATION_REF" \
             --app-ref "$APP_REF" \
-            --pipelines-ref "$PIPELINES_REF" \
-            < scripts/deploy/production.sh
+            --pipelines-ref "$PIPELINES_REF"
 
   deploy-processing:
     needs: [plan, verify-images, deploy-data, deploy-control]
@@ -375,12 +363,6 @@ jobs:
           private-key: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
           known-hosts: ${{ vars.ORACLE_SSH_KNOWN_HOSTS || secrets.ORACLE_SSH_KNOWN_HOSTS }}
 
-      - name: Preflight processing node
-        env:
-          HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
-          USER: ${{ vars.ORACLE_SSH_USER || secrets.ORACLE_SSH_USER }}
-        run: ssh "$USER@$HOST" bash -s -- processing < scripts/deploy/preflight_host.sh
-
       - name: Deploy processing node
         env:
           HOST: ${{ vars.ORACLE_PROCESSING_HOST || secrets.ORACLE_PROCESSING_HOST }}
@@ -391,15 +373,15 @@ jobs:
           CICD_REF: ${{ needs.plan.outputs.vn_news_cicd_ref }}
           PLATFORM_LIB_REF: ${{ needs.plan.outputs.vn_news_platform_lib_ref }}
         run: |
-          image_manifest_arg="$(printf '%q' "$IMAGE_MANIFEST")"
-          ssh "$USER@$HOST" bash -s -- \
+          scripts/deploy/remote_node.sh \
             --role processing \
-            --image-manifest "$image_manifest_arg" \
+            --host "$HOST" \
+            --user "$USER" \
+            --image-manifest "$IMAGE_MANIFEST" \
             --infra-ref "$INFRA_REF" \
             --config-ref "$CONFIG_REF" \
             --cicd-ref "$CICD_REF" \
-            --platform-lib-ref "$PLATFORM_LIB_REF" \
-            < scripts/deploy/production.sh
+            --platform-lib-ref "$PLATFORM_LIB_REF"
 
   archive-deployment:
     needs: [plan, deploy-processing]
