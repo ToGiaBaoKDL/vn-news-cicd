@@ -82,14 +82,11 @@ def parse_ref_overrides(refs: list[str], refs_text: str) -> dict[str, str]:
 
 
 def remote_ref_candidates(ref: str) -> tuple[str, ...]:
+    if ref.startswith("refs/tags/"):
+        raise ValueError("Deploy refs must be branches, commit SHAs, HEAD, or non-tag refs")
     if ref == "HEAD" or ref.startswith("refs/"):
         return (ref,)
-    return (
-        f"refs/heads/{ref}",
-        f"refs/tags/{ref}^{{}}",
-        f"refs/tags/{ref}",
-        ref,
-    )
+    return (f"refs/heads/{ref}",)
 
 
 def ls_remote(repo_url: str, ref: str) -> str | None:

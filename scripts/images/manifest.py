@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shlex
+from json import JSONDecodeError
 from pathlib import Path
 
 from scripts.images.catalog import (
@@ -16,27 +17,11 @@ from scripts.images.catalog import (
 from scripts.images.tags import validate_tag
 
 
-def parse_text_manifest(manifest: str) -> dict[str, str]:
-    entries = [
-        entry.strip()
-        for chunk in manifest.splitlines()
-        for entry in chunk.split(",")
-        if entry.strip()
-    ]
-    image_tags: dict[str, str] = {}
-    for entry in entries:
-        if "=" in entry:
-            owner, tag = entry.split("=", maxsplit=1)
-        elif ":" in entry:
-            owner, tag = entry.split(":", maxsplit=1)
-        else:
-            raise ValueError(f"Invalid image_manifest entry: {entry}")
-        image_tags[owner.strip()] = tag.strip()
-    return image_tags
-
-
 def parse_json_manifest(manifest: str) -> dict[str, str]:
-    payload = json.loads(manifest)
+    try:
+        payload = json.loads(manifest)
+    except JSONDecodeError as error:
+        raise ValueError("image_manifest must be JSON") from error
     if not isinstance(payload, dict):
         raise ValueError("image_manifest JSON must be an object")
     image_tags = payload.get("image_tags", payload)
@@ -54,11 +39,7 @@ def parse_image_manifest(manifest: str, catalog: dict) -> dict[str, str]:
     if not normalized:
         raise ValueError("image_manifest is required; deploy does not build images")
 
-    image_tags = (
-        parse_json_manifest(normalized)
-        if normalized.startswith("{")
-        else parse_text_manifest(normalized)
-    )
+    image_tags = parse_json_manifest(normalized)
     required_owners = set(image_owners(catalog))
     supplied_owners = set(image_tags)
     missing = sorted(required_owners - supplied_owners)

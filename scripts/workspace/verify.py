@@ -58,38 +58,6 @@ REQUIRED_SCRIPT_MODULES = (
     "scripts/services/spark/validate_cluster.py",
     "scripts/workspace/verify.py",
 )
-REMOVED_SCRIPT_MODULES = (
-    "scripts/bootstrap_polaris.py",
-    "scripts/bootstrap_storage.py",
-    "scripts/bootstrap_topics.py",
-    "scripts/build_images.py",
-    "scripts/image_catalog.py",
-    "scripts/services/polaris/bootstrap_catalog.py",
-    "scripts/services/polaris/catalog.py",
-    "scripts/services/polaris/client.py",
-    "scripts/services/polaris/common.py",
-    "scripts/services/polaris/provision_access.py",
-    "scripts/services/polaris/runtime_access.py",
-    "scripts/services/polaris/validate_access.py",
-    "scripts/polaris_common.py",
-    "scripts/prepare_release.py",
-    "scripts/provision_polaris_access.py",
-    "scripts/images/publish.py",
-    "scripts/publish_images.py",
-    "scripts/register_event_schemas.py",
-    "scripts/release/manifest.py",
-    "scripts/release/plan.py",
-    "scripts/release/prepare.py",
-    "scripts/release/refs.py",
-    "scripts/release/tags.py",
-    "scripts/release_manifest.py",
-    "scripts/release_plan.py",
-    "scripts/release_tags.py",
-    "scripts/validate_polaris_access.py",
-    "scripts/validate_release_refs.py",
-    "scripts/validate_workspace.py",
-    "scripts/verify_images.py",
-)
 REQUIRED_DEPLOY_SERVICE_FILES = (
     "scripts/deploy/services/airflow.sh",
     "scripts/deploy/services/app.sh",
@@ -99,10 +67,6 @@ REQUIRED_DEPLOY_SERVICE_FILES = (
     "scripts/deploy/services/redpanda.sh",
     "scripts/deploy/services/seaweedfs.sh",
     "scripts/deploy/services/spark.sh",
-)
-REMOVED_DEPLOY_SERVICE_FILES = (
-    "scripts/deploy/lib/vault.sh",
-    "scripts/deploy/services/processing.sh",
 )
 REQUIRED_INFRA_DEPLOY_FILES = (
     "scripts/host/bootstrap.sh",
@@ -153,18 +117,11 @@ def validate_workflow_action_pins() -> None:
 
 
 def validate_deployment_identity_usage() -> None:
-    stale_release_root = CICD_ROOT / "releases"
-    if stale_release_root.exists():
-        raise ValueError("releases/ must stay removed; deployment identity is commit refs")
-
     compose_paths = [APP_ROOT / "compose.yaml", *INFRA_ROOT.rglob("compose*.yaml")]
     for path in compose_paths:
         if not path.is_file():
             continue
         content = path.read_text(encoding="utf-8")
-        if "${VN_NEWS_RELEASE_TAG" in content:
-            relative_path = path.relative_to(WORKSPACE_ROOT)
-            raise ValueError(f"{relative_path} must use image manifest tags")
         if "VN_NEWS_IMAGE_TAG" in content:
             relative_path = path.relative_to(WORKSPACE_ROOT)
             raise ValueError(f"{relative_path} must not use global VN_NEWS_IMAGE_TAG")
@@ -183,23 +140,14 @@ def validate_deployment_identity_usage() -> None:
         for variable in required_variables:
             if content.count(f"{variable}=") != 1:
                 raise ValueError(f"{env_template} must define {variable} exactly once")
-        for variable in ("VN_NEWS_RELEASE_TAG", "VN_NEWS_IMAGE_TAG"):
-            if f"{variable}=" in content:
-                raise ValueError(f"{env_template} must not define {variable}")
-
     for relative_path in (
         "scripts/deploy/production.sh",
         "scripts/deploy/lib/context.sh",
         ".github/workflows/deploy-production.yaml",
     ):
         content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
-        for variable in (
-            "VN_NEWS_DEPLOY_RELEASE_TAG",
-            "VN_NEWS_DEPLOY_IMAGE_TAG",
-            "VN_NEWS_IMAGE_TAG",
-        ):
-            if variable in content:
-                raise ValueError(f"{relative_path} must not use {variable}")
+        if "VN_NEWS_IMAGE_TAG" in content:
+            raise ValueError(f"{relative_path} must not use global VN_NEWS_IMAGE_TAG")
 
     deploy_workflow = (CICD_ROOT / ".github" / "workflows" / "deploy-production.yaml").read_text(
         encoding="utf-8"
@@ -235,23 +183,11 @@ def validate_script_layout() -> None:
     if missing_modules:
         raise ValueError(f"Missing modular CICD script modules: {missing_modules}")
 
-    stale_modules = [path for path in REMOVED_SCRIPT_MODULES if (CICD_ROOT / path).exists()]
-    if stale_modules:
-        raise ValueError(f"Stale CICD script modules must stay removed: {stale_modules}")
-
     missing_deploy_services = [
         path for path in REQUIRED_DEPLOY_SERVICE_FILES if not (CICD_ROOT / path).is_file()
     ]
     if missing_deploy_services:
         raise ValueError(f"Missing modular deploy service scripts: {missing_deploy_services}")
-
-    stale_deploy_services = [
-        path for path in REMOVED_DEPLOY_SERVICE_FILES if (CICD_ROOT / path).exists()
-    ]
-    if stale_deploy_services:
-        raise ValueError(
-            f"Redundant deploy service scripts must stay removed: {stale_deploy_services}"
-        )
 
     missing_infra_deploy_files = [
         path for path in REQUIRED_INFRA_DEPLOY_FILES if not (INFRA_ROOT / path).is_file()
@@ -365,6 +301,8 @@ def validate_source_image_workflow(owner: str, root: Path) -> None:
             raise ValueError(f"{workflow_path} missing image publish fragment: {fragment}")
     if owner in {"vn-news-app", "vn-news-services"} and "platform_lib_ref" not in workflow:
         raise ValueError(f"{workflow_path} must include platform_lib_ref input")
+    if "VN_NEWS_ENABLE_IMAGE_PUBLISH" in workflow:
+        raise ValueError(f"{workflow_path} must publish directly on image-relevant pushes")
 
 
 def validate_image_build(image_key: str, build: dict) -> None:

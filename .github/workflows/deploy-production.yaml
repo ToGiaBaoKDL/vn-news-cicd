@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       image_manifest:
-        description: Published image owner tags as JSON or key-value text.
+        description: Published image owner tags as compact JSON.
         required: true
         type: string
       default_ref:

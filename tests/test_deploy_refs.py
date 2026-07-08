@@ -28,10 +28,16 @@ def test_commit_ref_detection_accepts_uppercase_sha() -> None:
     assert refs.is_commit_ref("A" * 40)
 
 
+def test_remote_ref_candidates_use_branch_names_by_default() -> None:
+    assert refs.remote_ref_candidates("main") == ("refs/heads/main",)
+    with pytest.raises(ValueError, match="non-tag refs"):
+        refs.remote_ref_candidates("refs/tags/v1")
+
+
 def test_image_manifest_rejects_bare_tag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(refs, "resolve_remote_ref", lambda _owner, _repo_name, _ref: "a" * 40)
 
-    with pytest.raises(ValueError, match="Invalid image_manifest entry"):
+    with pytest.raises(ValueError, match="image_manifest must be JSON"):
         refs.resolve_deploy_refs(
             owner="example",
             default_ref="main",
@@ -55,9 +61,9 @@ def test_resolve_deploy_refs_uses_image_manifest(monkeypatch: pytest.MonkeyPatch
         default_ref="main",
         ref_overrides={},
         image_manifest=(
-            "vn-news-app=sha-111111111111-777777777777,"
-            "vn-news-infra=sha-444444444444,"
-            "vn-news-services=sha-888888888888-777777777777"
+            '{"vn-news-app":"sha-111111111111-777777777777",'
+            '"vn-news-infra":"sha-444444444444",'
+            '"vn-news-services":"sha-888888888888-777777777777"}'
         ),
     )
 
@@ -86,9 +92,9 @@ def test_resolve_deploy_refs_rejects_mismatched_image_manifest(
             default_ref="main",
             ref_overrides={"vn-news-app": "feature"},
             image_manifest=(
-                "vn-news-app=sha-wrong,"
-                "vn-news-infra=sha-444444444444,"
-                "vn-news-services=sha-888888888888-777777777777"
+                '{"vn-news-app":"sha-wrong",'
+                '"vn-news-infra":"sha-444444444444",'
+                '"vn-news-services":"sha-888888888888-777777777777"}'
             ),
         )
 
