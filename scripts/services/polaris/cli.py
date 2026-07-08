@@ -11,6 +11,17 @@ from scripts.services.polaris.config import (
     credentials_from_cli_payload,
 )
 
+DUPLICATE_GRANT_MARKERS = (
+    "grant_records_pkey",
+    "duplicate key value violates unique constraint",
+    "already exists",
+)
+
+
+def is_duplicate_grant_error(output: str) -> bool:
+    normalized = output.lower()
+    return all(marker in normalized for marker in DUPLICATE_GRANT_MARKERS)
+
 
 @dataclass(frozen=True)
 class PolarisCli:
@@ -61,7 +72,14 @@ class PolarisCli:
         args = ["setup", "apply", str(path)]
         if dry_run:
             args.append("--dry-run")
-        self.run(*args)
+        result = self.run(*args, check=False, capture_output=True)
+        if result.returncode == 0:
+            return
+        output = f"{result.stdout}\n{result.stderr}"
+        if is_duplicate_grant_error(output):
+            print("Polaris setup grants already exist; continuing")
+            return
+        result.check_returncode()
 
     def create_runtime_principal(
         self,

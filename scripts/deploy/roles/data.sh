@@ -9,13 +9,25 @@ deploy_data_role() {
   reset_role_state
   materialize_role_secrets
   configure_role_operations
+
   deploy_redpanda
+  provision_redpanda_topics
+  provision_redpanda_schemas
+  validate_redpanda
+  cleanup_redpanda
+
   deploy_seaweedfs
+  provision_seaweedfs_buckets
+  validate_seaweedfs
+  cleanup_seaweedfs
+
   deploy_polaris
-  bootstrap_redpanda_topics
-  bootstrap_redpanda_schemas
-  bootstrap_seaweedfs_buckets
   provision_polaris
   validate_polaris
+  cleanup_polaris
+
   deploy_data_access
+  provision_cloudflare
+  validate_cloudflare
+  cleanup_cloudflare
 }

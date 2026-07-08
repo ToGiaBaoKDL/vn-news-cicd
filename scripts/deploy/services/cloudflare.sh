@@ -9,3 +9,15 @@ deploy_control_access() {
   compose_control pull cloudflared-control
   compose_control up -d --wait cloudflared-control
 }
+
+provision_cloudflare() {
+  return 0
+}
+
+validate_cloudflare() {
+  return 0
+}
+
+cleanup_cloudflare() {
+  return 0
+}

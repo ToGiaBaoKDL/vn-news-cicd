@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from scripts.services.redpanda import bootstrap_topics, register_schemas
+from scripts.services.redpanda import provision_topics, register_schemas
 
 
-def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypatch) -> None:
+def test_provision_topics_disables_auto_create_and_reconciles_retention(monkeypatch) -> None:
     config = {
         "event_bus": {
             "bootstrap_servers": "redpanda:9092",
@@ -21,11 +21,11 @@ def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypa
     }
     commands: list[list[str]] = []
 
-    monkeypatch.setattr(bootstrap_topics, "load_settings", lambda: config)
+    monkeypatch.setattr(provision_topics, "load_settings", lambda: config)
     monkeypatch.setattr(
-        bootstrap_topics,
+        provision_topics,
         "parse_args",
-        lambda: bootstrap_topics.argparse.Namespace(
+        lambda: provision_topics.argparse.Namespace(
             brokers=None,
             rpk_command="rpk",
             disable_auto_create=True,
@@ -33,12 +33,12 @@ def test_bootstrap_topics_disables_auto_create_and_reconciles_retention(monkeypa
         ),
     )
     monkeypatch.setattr(
-        bootstrap_topics.subprocess,
+        provision_topics.subprocess,
         "run",
         lambda command, check: commands.append(command),
     )
 
-    bootstrap_topics.main()
+    provision_topics.main()
 
     assert commands[0] == [
         "rpk",

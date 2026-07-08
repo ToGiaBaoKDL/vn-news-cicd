@@ -7,6 +7,10 @@ deploy_airflow() {
   compose_control up -d --wait docker-socket-proxy airflow-scheduler airflow-dag-processor airflow-api-server
 }
 
+provision_airflow() {
+  return 0
+}
+
 validate_airflow() {
   local expected_dag="${VN_NEWS_AIRFLOW_EXPECTED_DAG_ID:?set VN_NEWS_AIRFLOW_EXPECTED_DAG_ID}"
   local max_attempts="${VN_NEWS_AIRFLOW_DAG_VALIDATION_ATTEMPTS:-12}"
@@ -27,4 +31,8 @@ validate_airflow() {
   echo "Airflow DAG not found after deploy: $expected_dag" >&2
   compose_control exec -T airflow-api-server airflow dags list >&2
   exit 1
+}
+
+cleanup_airflow() {
+  return 0
 }

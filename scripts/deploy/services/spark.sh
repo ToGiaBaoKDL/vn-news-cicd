@@ -10,6 +10,10 @@ deploy_spark_worker() {
   compose_processing up -d --wait spark-worker
 }
 
+provision_spark() {
+  return 0
+}
+
 spark_master_host() {
   local master_url="${VN_NEWS_SPARK_MASTER_URL:?set VN_NEWS_SPARK_MASTER_URL}"
   local host_port="${master_url#spark://}"
@@ -38,4 +42,8 @@ validate_spark_worker_registered() {
     --worker-host "$worker_host" \
     --attempts "$max_attempts" \
     --sleep-seconds "$sleep_seconds"
+}
+
+cleanup_spark() {
+  return 0
 }

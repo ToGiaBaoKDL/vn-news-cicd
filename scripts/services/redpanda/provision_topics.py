@@ -8,7 +8,7 @@ from news_platform.config import load_settings
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Bootstrap configured Redpanda topics.")
+    parser = argparse.ArgumentParser(description="Provision configured Redpanda topics.")
     parser.add_argument("--brokers")
     parser.add_argument("--rpk-command", default="rpk")
     parser.add_argument("--disable-auto-create", action="store_true")

@@ -12,10 +12,24 @@ deploy_control_role() {
   reset_role_state
   materialize_role_secrets
   configure_role_operations
+
   deploy_spark_master
+  provision_spark
   validate_spark_master
+  cleanup_spark
+
   deploy_airflow
+  provision_airflow
   validate_airflow
+  cleanup_airflow
+
   deploy_app
+  provision_app
+  validate_app
+  cleanup_app
+
   deploy_control_access
+  provision_cloudflare
+  validate_cloudflare
+  cleanup_cloudflare
 }

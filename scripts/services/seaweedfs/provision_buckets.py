@@ -8,7 +8,7 @@ from news_platform.config import load_settings
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Bootstrap configured object-storage buckets.")
+    parser = argparse.ArgumentParser(description="Provision configured object-storage buckets.")
     parser.add_argument("--endpoint-url")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()

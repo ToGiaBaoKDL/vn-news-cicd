@@ -2,6 +2,56 @@ from __future__ import annotations
 
 from scripts.workspace.common import APP_ROOT, CICD_ROOT, INFRA_ROOT, WORKSPACE_ROOT
 
+SERVICE_LIFECYCLE_HOOKS = {
+    "airflow.sh": (
+        "deploy_airflow",
+        "provision_airflow",
+        "validate_airflow",
+        "cleanup_airflow",
+    ),
+    "app.sh": ("deploy_app", "provision_app", "validate_app", "cleanup_app"),
+    "cloudflare.sh": (
+        "deploy_data_access",
+        "deploy_control_access",
+        "provision_cloudflare",
+        "validate_cloudflare",
+        "cleanup_cloudflare",
+    ),
+    "ingestion.sh": (
+        "deploy_ingestion_workers",
+        "provision_ingestion_workers",
+        "validate_ingestion_workers",
+        "cleanup_ingestion_workers",
+    ),
+    "polaris.sh": (
+        "deploy_polaris",
+        "provision_polaris",
+        "validate_polaris",
+        "cleanup_polaris",
+    ),
+    "redpanda.sh": (
+        "deploy_redpanda",
+        "provision_redpanda_topics",
+        "provision_redpanda_schemas",
+        "validate_redpanda",
+        "cleanup_redpanda",
+    ),
+    "seaweedfs.sh": (
+        "deploy_seaweedfs",
+        "provision_seaweedfs_buckets",
+        "validate_seaweedfs",
+        "cleanup_seaweedfs",
+    ),
+    "spark.sh": (
+        "deploy_spark_master",
+        "deploy_spark_worker",
+        "provision_spark",
+        "validate_spark_master",
+        "validate_spark_worker_registered",
+        "cleanup_spark",
+    ),
+}
+
 
 def validate_deployment_identity_usage() -> None:
     compose_paths = [APP_ROOT / "compose.yaml", *INFRA_ROOT.rglob("compose*.yaml")]
@@ -23,6 +73,7 @@ def validate_deployment_identity_usage() -> None:
 
     validate_deploy_workflow()
     validate_deploy_context()
+    validate_deploy_service_lifecycle()
     validate_remote_deploy_wrapper()
 
 
@@ -107,3 +158,34 @@ def validate_remote_deploy_wrapper() -> None:
     ):
         if fragment not in remote_deploy:
             raise ValueError(f"remote deploy wrapper missing fragment: {fragment}")
+
+
+def validate_deploy_service_lifecycle() -> None:
+    service_root = CICD_ROOT / "scripts" / "deploy" / "services"
+    for service_file, hooks in SERVICE_LIFECYCLE_HOOKS.items():
+        content = (service_root / service_file).read_text(encoding="utf-8")
+        for hook in hooks:
+            if f"{hook}()" not in content:
+                raise ValueError(f"{service_file} missing lifecycle hook: {hook}")
+
+    for relative_path in (
+        "scripts/deploy/roles/data.sh",
+        "scripts/deploy/roles/control.sh",
+        "scripts/deploy/roles/processing.sh",
+        "scripts/deploy/services/redpanda.sh",
+        "scripts/deploy/services/seaweedfs.sh",
+        "Makefile",
+    ):
+        content = (CICD_ROOT / relative_path).read_text(encoding="utf-8")
+        for stale_fragment in (
+            "bootstrap_redpanda_topics",
+            "bootstrap_redpanda_schemas",
+            "bootstrap_seaweedfs_buckets",
+            "bootstrap_topics.py",
+            "bootstrap_buckets.py",
+            "bootstrap-topics",
+            "bootstrap-storage",
+            "bootstrap-ingestion",
+        ):
+            if stale_fragment in content:
+                raise ValueError(f"{relative_path} contains stale bootstrap fragment")

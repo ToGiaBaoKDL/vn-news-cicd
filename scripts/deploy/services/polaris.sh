@@ -30,3 +30,7 @@ validate_polaris() {
     --catalog-url "$VN_NEWS_POLARIS_CATALOG_URL" \
     --storage-endpoint-url "$VN_NEWS_STORAGE_ENDPOINT_URL"
 }
+
+cleanup_polaris() {
+  return 0
+}

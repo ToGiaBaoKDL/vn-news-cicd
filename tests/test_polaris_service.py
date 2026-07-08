@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from scripts.services.polaris import config as polaris_config
 from scripts.services.polaris import provision
-from scripts.services.polaris.cli import PolarisCli
+from scripts.services.polaris.cli import PolarisCli, is_duplicate_grant_error
 
 
 def test_load_credentials_reads_single_realm_file(tmp_path: Path) -> None:
@@ -157,6 +157,62 @@ def test_cli_create_runtime_principal_parses_credentials(monkeypatch: pytest.Mon
         client_secret="runtime-secret",
     )
     assert any("principals" in call for call in calls)
+
+
+def test_duplicate_grant_error_detection_matches_polaris_response() -> None:
+    output = (
+        'HTTP response body: {"error":{"message":"Failed to write to grant records due to '
+        "Failed due to 'ERROR: duplicate key value violates unique constraint "
+        '\\"grant_records_pkey\\"\\n  Detail: Key (realm_id, securable_catalog_id, '
+        "securable_id, grantee_catalog_id, grantee_id, privilege_code)="
+        "(POLARIS, 1, 2, 1, 3, 92) already exists.'\"}}"
+    )
+
+    assert is_duplicate_grant_error(output)
+    assert not is_duplicate_grant_error("HTTP 500: storage backend unavailable")
+
+
+def test_setup_apply_tolerates_duplicate_grant_response(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fake_run(command, check, capture_output, text):
+        assert check is False
+        assert capture_output is True
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            "",
+            'duplicate key value violates unique constraint "grant_records_pkey"; already exists',
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    cli = PolarisCli(
+        base_url="http://polaris:8181",
+        credentials=polaris_config.PolarisCredentials("POLARIS", "admin", "secret"),
+    )
+
+    cli.setup_apply(tmp_path / "setup.yaml")
+
+    assert "already exist" in capsys.readouterr().out
+
+
+def test_setup_apply_surfaces_unexpected_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(command, check, capture_output, text):
+        return subprocess.CompletedProcess(command, 1, "", "storage backend unavailable")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    cli = PolarisCli(
+        base_url="http://polaris:8181",
+        credentials=polaris_config.PolarisCredentials("POLARIS", "admin", "secret"),
+    )
+
+    with pytest.raises(subprocess.CalledProcessError):
+        cli.setup_apply(tmp_path / "setup.yaml")
 
 
 def test_provision_updates_vault_when_runtime_secret_is_pending(

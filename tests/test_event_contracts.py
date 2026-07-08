@@ -10,7 +10,7 @@ def test_event_contracts_cover_configured_topics() -> None:
     assert set(EVENT_CONTRACTS) == set(EVENT_TOPIC_KEYS.values())
 
 
-def test_topic_definitions_are_bootstrap_ready() -> None:
+def test_topic_definitions_are_provision_ready() -> None:
     config = load_settings()
     topics = config["event_bus"]["topics"]
 
