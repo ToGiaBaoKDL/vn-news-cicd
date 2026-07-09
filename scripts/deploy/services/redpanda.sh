@@ -5,6 +5,15 @@ deploy_redpanda() {
   compose_data up -d --wait redpanda redpanda-console
 }
 
+provision_redpanda_schema_registry() {
+  local rpk_command
+
+  rpk_command="docker compose --env-file $env_file -f $infra_root/compose.data.yaml exec -T redpanda rpk"
+  run_cicd_module scripts.services.redpanda.provision_schema_registry \
+    --rpk-command "$rpk_command" \
+    --brokers localhost:9092
+}
+
 provision_redpanda_topics() {
   local rpk_command
 
@@ -23,6 +32,7 @@ provision_redpanda_schemas() {
 
 validate_redpanda() {
   compose_data exec -T redpanda rpk cluster health -X brokers=localhost:9092
+  curl --fail --silent "$VN_NEWS_SCHEMA_REGISTRY_URL/subjects" >/dev/null
 }
 
 cleanup_redpanda() {

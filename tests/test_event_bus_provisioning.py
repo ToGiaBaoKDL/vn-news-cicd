@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from scripts.services.redpanda import provision_topics, register_schemas
+from scripts.services.redpanda import provision_schema_registry, provision_topics, register_schemas
 
 
 def test_provision_topics_disables_auto_create_and_reconciles_retention(monkeypatch) -> None:
@@ -34,9 +34,7 @@ def test_provision_topics_disables_auto_create_and_reconciles_retention(monkeypa
         ),
     )
     monkeypatch.setattr(
-        provision_topics.subprocess,
-        "run",
-        lambda command, check: commands.append(command),
+        provision_topics.rpk.subprocess, "run", lambda command, check: commands.append(command)
     )
 
     provision_topics.main()
@@ -101,6 +99,65 @@ def test_provision_topics_disables_auto_create_and_reconciles_retention(monkeypa
         "--no-confirm",
         "-X",
         "brokers=redpanda:9092",
+    ]
+
+
+def test_provision_schema_registry_creates_durable_internal_topic(monkeypatch) -> None:
+    config = {"event_bus": {"bootstrap_servers": "redpanda:9092"}}
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(provision_schema_registry, "load_settings", lambda: config)
+    monkeypatch.setattr(
+        provision_schema_registry,
+        "parse_args",
+        lambda: provision_schema_registry.argparse.Namespace(
+            brokers=None,
+            rpk_command="rpk",
+            recreate_schema_topic=False,
+            dry_run=False,
+        ),
+    )
+    monkeypatch.setattr(
+        provision_schema_registry.rpk.subprocess,
+        "run",
+        lambda command, check: commands.append(command),
+    )
+
+    provision_schema_registry.main()
+
+    assert commands == [
+        [
+            "rpk",
+            "topic",
+            "create",
+            "_schemas",
+            "--if-not-exists",
+            "--partitions",
+            "1",
+            "--topic-config",
+            "cleanup.policy=compact",
+            "--topic-config",
+            "retention.ms=-1",
+            "--topic-config",
+            "retention.bytes=-1",
+            "-X",
+            "brokers=redpanda:9092",
+        ],
+        [
+            "rpk",
+            "topic",
+            "alter-config",
+            "_schemas",
+            "--set",
+            "cleanup.policy=compact",
+            "--set",
+            "retention.ms=-1",
+            "--set",
+            "retention.bytes=-1",
+            "--no-confirm",
+            "-X",
+            "brokers=redpanda:9092",
+        ],
     ]
 
 

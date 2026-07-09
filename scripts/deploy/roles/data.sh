@@ -11,6 +11,7 @@ deploy_data_role() {
   configure_role_operations
 
   deploy_redpanda
+  provision_redpanda_schema_registry
   provision_redpanda_topics
   provision_redpanda_schemas
   validate_redpanda

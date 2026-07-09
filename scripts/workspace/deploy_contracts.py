@@ -31,6 +31,7 @@ SERVICE_LIFECYCLE_HOOKS = {
     ),
     "redpanda.sh": (
         "deploy_redpanda",
+        "provision_redpanda_schema_registry",
         "provision_redpanda_topics",
         "provision_redpanda_schemas",
         "validate_redpanda",
