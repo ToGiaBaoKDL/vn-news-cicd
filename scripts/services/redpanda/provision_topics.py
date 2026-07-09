@@ -8,7 +8,7 @@ from news_platform.config import load_settings
 
 REDPANDA_COMMUNITY_CONFIG = {
     "core_balancing_continuous": "false",
-    "partition_auto_balancing_continuous": "false",
+    "partition_autobalancing_mode": "off",
 }
 
 
