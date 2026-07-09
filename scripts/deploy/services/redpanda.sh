@@ -12,6 +12,7 @@ provision_redpanda_topics() {
   run_cicd_module scripts.services.redpanda.provision_topics \
     --rpk-command "$rpk_command" \
     --brokers localhost:9092 \
+    --disable-enterprise-balancing \
     --disable-auto-create
 }
 

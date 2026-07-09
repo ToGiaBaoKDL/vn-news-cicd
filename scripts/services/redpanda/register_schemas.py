@@ -16,22 +16,12 @@ REQUEST_SLEEP_SECONDS = 5
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Register event JSON Schemas in Redpanda.")
     parser.add_argument("--registry-url")
-    parser.add_argument("--compatibility", default="BACKWARD")
     parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print subjects without registering.",
     )
     return parser.parse_args()
-
-
-def set_compatibility(registry_url: str, compatibility: str, *, dry_run: bool) -> None:
-    if dry_run:
-        print(f"would set schema compatibility: {compatibility}")
-        return
-
-    request_registry("PUT", f"{registry_url}/config", {"compatibility": compatibility})
-    print(f"schema compatibility set: {compatibility}")
 
 
 def request_registry(method: str, url: str, payload: dict[str, object]) -> httpx.Response:
@@ -76,7 +66,6 @@ def main() -> None:
     args = parse_args()
     config = load_settings()
     registry_url = (args.registry_url or config["event_bus"]["schema_registry_url"]).rstrip("/")
-    set_compatibility(registry_url, args.compatibility, dry_run=args.dry_run)
 
     for topic_key, event_name in sorted(EVENT_TOPIC_KEYS.items()):
         topic = get_topic_name(config, topic_key)

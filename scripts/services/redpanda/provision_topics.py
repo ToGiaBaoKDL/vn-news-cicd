@@ -6,11 +6,17 @@ import subprocess
 
 from news_platform.config import load_settings
 
+REDPANDA_COMMUNITY_CONFIG = {
+    "core_balancing_continuous": "false",
+    "partition_auto_balancing_continuous": "false",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Provision configured Redpanda topics.")
     parser.add_argument("--brokers")
     parser.add_argument("--rpk-command", default="rpk")
+    parser.add_argument("--disable-enterprise-balancing", action="store_true")
     parser.add_argument("--disable-auto-create", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -31,6 +37,22 @@ def main() -> None:
     config = load_settings()
     prefix = shlex.split(args.rpk_command)
     brokers = args.brokers or config["event_bus"]["bootstrap_servers"]
+    if args.disable_enterprise_balancing:
+        for key, value in REDPANDA_COMMUNITY_CONFIG.items():
+            run(
+                rpk_command(
+                    prefix,
+                    "cluster",
+                    "config",
+                    "set",
+                    key,
+                    value,
+                    "--no-confirm",
+                    brokers=brokers,
+                ),
+                dry_run=args.dry_run,
+            )
+
     if args.disable_auto_create:
         run(
             rpk_command(
