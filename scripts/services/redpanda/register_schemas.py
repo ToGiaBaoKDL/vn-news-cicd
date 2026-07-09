@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 
 import httpx
 from news_platform.config import get_topic_name, load_settings
 from news_platform.contracts.events import EVENT_TOPIC_KEYS, event_json_schema
+
+SCHEMA_REGISTRY_CONTENT_TYPE = "application/vnd.schemaregistry.v1+json"
+REQUEST_ATTEMPTS = 6
+REQUEST_RETRY_STATUSES = {400, 408, 425, 429, 500, 502, 503, 504}
+REQUEST_SLEEP_SECONDS = 5
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,13 +31,42 @@ def set_compatibility(registry_url: str, compatibility: str, *, dry_run: bool) -
         print(f"would set schema compatibility: {compatibility}")
         return
 
-    response = httpx.put(
-        f"{registry_url}/config",
-        json={"compatibility": compatibility},
-        timeout=10,
-    )
-    response.raise_for_status()
+    request_registry("PUT", f"{registry_url}/config", {"compatibility": compatibility})
     print(f"schema compatibility set: {compatibility}")
+
+
+def request_registry(method: str, url: str, payload: dict[str, object]) -> httpx.Response:
+    response = httpx.Response(599, request=httpx.Request(method, url))
+    for attempt in range(1, REQUEST_ATTEMPTS + 1):
+        response = httpx.request(
+            method,
+            url,
+            headers={"Content-Type": SCHEMA_REGISTRY_CONTENT_TYPE},
+            json=payload,
+            timeout=10,
+        )
+        if response.status_code < 400:
+            return response
+        if response.status_code not in REQUEST_RETRY_STATUSES or attempt == REQUEST_ATTEMPTS:
+            break
+        print(
+            f"schema registry {method} {url} returned {response.status_code}; "
+            f"retrying {attempt}/{REQUEST_ATTEMPTS}"
+        )
+        time.sleep(REQUEST_SLEEP_SECONDS)
+
+    raise_registry_status(response)
+    return response
+
+
+def raise_registry_status(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        body = response.text.strip()
+        if body:
+            error.add_note(f"schema registry response body: {body[:1000]}")
+        raise
 
 
 def main() -> None:
@@ -48,12 +83,11 @@ def main() -> None:
             print(f"would register {subject} -> {event_name}")
             continue
 
-        response = httpx.post(
+        response = request_registry(
+            "POST",
             f"{registry_url}/subjects/{subject}/versions",
-            json={"schemaType": "JSON", "schema": json.dumps(schema, sort_keys=True)},
-            timeout=10,
+            {"schemaType": "JSON", "schema": json.dumps(schema, sort_keys=True)},
         )
-        response.raise_for_status()
         version = response.json().get("version", "unknown")
         print(f"registered {subject} version={version}")
 

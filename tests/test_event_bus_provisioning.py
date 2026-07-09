@@ -95,8 +95,11 @@ def test_register_schemas_sets_compatibility_first(monkeypatch) -> None:
     }
 
     class Response:
-        def __init__(self, payload: dict[str, object] | None = None) -> None:
+        def __init__(
+            self, payload: dict[str, object] | None = None, status_code: int = 200
+        ) -> None:
             self.payload = payload or {}
+            self.status_code = status_code
 
         def raise_for_status(self) -> None:
             return None
@@ -124,16 +127,14 @@ def test_register_schemas_sets_compatibility_first(monkeypatch) -> None:
             dry_run=False,
         ),
     )
-    monkeypatch.setattr(
-        register_schemas.httpx,
-        "put",
-        lambda url, json, timeout: calls.append(("PUT", url, json)) or Response(),
-    )
-    monkeypatch.setattr(
-        register_schemas.httpx,
-        "post",
-        lambda url, json, timeout: calls.append(("POST", url, json)) or Response({"version": 1}),
-    )
+
+    def request(method, url, headers, json, timeout):
+        calls.append((method, url, json))
+        if method == "POST":
+            return Response({"version": 1})
+        return Response()
+
+    monkeypatch.setattr(register_schemas.httpx, "request", request)
 
     register_schemas.main()
 
@@ -160,11 +161,13 @@ def test_register_schemas_surfaces_registry_errors(monkeypatch) -> None:
         ),
     )
 
-    def fail_put(url, json, timeout):
-        response = httpx.Response(500, request=httpx.Request("PUT", url))
+    monkeypatch.setattr(register_schemas, "REQUEST_ATTEMPTS", 1)
+
+    def fail_request(method, url, headers, json, timeout):
+        response = httpx.Response(500, request=httpx.Request(method, url), text="not ready")
         return response
 
-    monkeypatch.setattr(register_schemas.httpx, "put", fail_put)
+    monkeypatch.setattr(register_schemas.httpx, "request", fail_request)
 
     with pytest.raises(httpx.HTTPStatusError):
         register_schemas.main()
