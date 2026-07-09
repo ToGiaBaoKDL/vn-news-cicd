@@ -8,7 +8,6 @@ import httpx
 from news_platform.config import get_topic_name, load_settings
 from news_platform.contracts.events import EVENT_TOPIC_KEYS, event_json_schema
 
-SCHEMA_REGISTRY_CONTENT_TYPE = "application/vnd.schemaregistry.v1+json"
 REQUEST_ATTEMPTS = 6
 REQUEST_RETRY_STATUSES = {400, 408, 425, 429, 500, 502, 503, 504}
 REQUEST_SLEEP_SECONDS = 5
@@ -38,13 +37,17 @@ def set_compatibility(registry_url: str, compatibility: str, *, dry_run: bool) -
 def request_registry(method: str, url: str, payload: dict[str, object]) -> httpx.Response:
     response = httpx.Response(599, request=httpx.Request(method, url))
     for attempt in range(1, REQUEST_ATTEMPTS + 1):
-        response = httpx.request(
-            method,
-            url,
-            headers={"Content-Type": SCHEMA_REGISTRY_CONTENT_TYPE},
-            json=payload,
-            timeout=10,
-        )
+        try:
+            response = httpx.request(method, url, json=payload, timeout=10)
+        except httpx.RequestError as error:
+            if attempt == REQUEST_ATTEMPTS:
+                raise
+            print(
+                f"schema registry {method} {url} failed with "
+                f"{type(error).__name__}; retrying {attempt}/{REQUEST_ATTEMPTS}"
+            )
+            time.sleep(REQUEST_SLEEP_SECONDS)
+            continue
         if response.status_code < 400:
             return response
         if response.status_code not in REQUEST_RETRY_STATUSES or attempt == REQUEST_ATTEMPTS:

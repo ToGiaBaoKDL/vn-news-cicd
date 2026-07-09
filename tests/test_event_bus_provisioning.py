@@ -128,7 +128,7 @@ def test_register_schemas_sets_compatibility_first(monkeypatch) -> None:
         ),
     )
 
-    def request(method, url, headers, json, timeout):
+    def request(method, url, json, timeout):
         calls.append((method, url, json))
         if method == "POST":
             return Response({"version": 1})
@@ -163,7 +163,7 @@ def test_register_schemas_surfaces_registry_errors(monkeypatch) -> None:
 
     monkeypatch.setattr(register_schemas, "REQUEST_ATTEMPTS", 1)
 
-    def fail_request(method, url, headers, json, timeout):
+    def fail_request(method, url, json, timeout):
         response = httpx.Response(500, request=httpx.Request(method, url), text="not ready")
         return response
 
