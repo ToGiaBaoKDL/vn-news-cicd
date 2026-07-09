@@ -161,6 +161,77 @@ def test_provision_schema_registry_creates_durable_internal_topic(monkeypatch) -
     ]
 
 
+def test_provision_schema_registry_recreate_restores_protection(monkeypatch) -> None:
+    config = {"event_bus": {"bootstrap_servers": "redpanda:9092"}}
+    commands: list[list[str]] = []
+    topic_exists = True
+
+    monkeypatch.setattr(provision_schema_registry, "load_settings", lambda: config)
+    monkeypatch.setattr(
+        provision_schema_registry,
+        "parse_args",
+        lambda: provision_schema_registry.argparse.Namespace(
+            brokers=None,
+            rpk_command="rpk",
+            recreate_schema_topic=True,
+            dry_run=False,
+        ),
+    )
+
+    def capture(command: list[str]) -> str:
+        nonlocal topic_exists
+        if command[:5] == ["rpk", "cluster", "config", "get", "kafka_nodelete_topics"]:
+            return "- _redpanda.audit_log\n- __consumer_offsets\n- _schemas\n"
+        if command[:3] == ["rpk", "topic", "list"]:
+            if topic_exists:
+                topic_exists = False
+                return "NAME PARTITIONS REPLICAS\n_schemas 1 1\n"
+            return "NAME PARTITIONS REPLICAS\n"
+        raise AssertionError(command)
+
+    monkeypatch.setattr(provision_schema_registry.rpk, "capture", capture)
+    monkeypatch.setattr(
+        provision_schema_registry.rpk.subprocess,
+        "run",
+        lambda command, check: commands.append(command),
+    )
+
+    provision_schema_registry.main()
+
+    assert commands[0] == [
+        "rpk",
+        "cluster",
+        "config",
+        "set",
+        "kafka_nodelete_topics",
+        '["_redpanda.audit_log", "__consumer_offsets"]',
+        "--no-confirm",
+        "-X",
+        "brokers=redpanda:9092",
+    ]
+    assert commands[1] == [
+        "rpk",
+        "topic",
+        "delete",
+        "_schemas",
+        "-X",
+        "brokers=redpanda:9092",
+    ]
+    assert commands[2] == [
+        "rpk",
+        "cluster",
+        "config",
+        "set",
+        "kafka_nodelete_topics",
+        '["_redpanda.audit_log", "__consumer_offsets", "_schemas"]',
+        "--no-confirm",
+        "-X",
+        "brokers=redpanda:9092",
+    ]
+    assert commands[3][:5] == ["rpk", "topic", "create", "_schemas", "--if-not-exists"]
+    assert commands[4][:4] == ["rpk", "topic", "alter-config", "_schemas"]
+
+
 def test_register_schemas_registers_topic_subjects(monkeypatch) -> None:
     calls: list[tuple[str, str, dict[str, object]]] = []
     config = {
