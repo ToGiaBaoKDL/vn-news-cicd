@@ -21,7 +21,6 @@ def image_manifest(**overrides: str) -> str:
         "service_article_fetcher": digest_ref("vn-news-article-fetcher"),
         "service_dlq_operator": digest_ref("vn-news-dlq-operator"),
         "service_feed_ingestor": digest_ref("vn-news-feed-ingestor"),
-        "service_pipeline_metrics": digest_ref("vn-news-pipeline-metrics"),
     }
     payload.update(overrides)
     return json.dumps(payload, separators=(",", ":"))

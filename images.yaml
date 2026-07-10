@@ -55,12 +55,6 @@ images:
     image_env: VN_NEWS_ARTICLE_EXTRACTOR_IMAGE
     roles: [processing]
 
-  service_pipeline_metrics:
-    owner: vn-news-services
-    image_repository: vn-news-pipeline-metrics
-    image_env: VN_NEWS_PIPELINE_METRICS_IMAGE
-    roles: [processing]
-
   service_dlq_operator:
     owner: vn-news-services
     image_repository: vn-news-dlq-operator
